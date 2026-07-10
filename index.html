@@ -1,6 +1,10 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
+  html, body {
+    margin: 0; padding: 0; background: #16302E; min-height: 100%;
+  }
+
   #archive-root {
     --bg: #16302E;
     --bg-deep: #0F2422;
@@ -37,7 +41,7 @@
   #archive-root button { font-family: inherit; cursor: pointer; }
   #archive-root input, #archive-root select { font-family: inherit; }
 
-  #archive-root .wrap { max-width: 720px; margin: 0 auto; padding: 28px 20px 60px; }
+  #archive-root .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 40px; }
 
   #archive-root .header {
     display: flex; align-items: baseline; justify-content: space-between;
@@ -350,19 +354,23 @@
     return map[code] || (err && err.message) || '알 수 없는 오류가 발생했어요';
   }
 
-  // per-user Firestore-backed storage. Requires state.user to be set.
-  async function storeGet(key){
-    if (!state.user) throw new Error('로그인이 필요합니다');
-    var docRef = fbDb.collection('users').doc(state.user.uid).collection('store').doc(key);
-    var snap = await docRef.get();
-    if (!snap.exists) throw new Error('키 없음: ' + key);
-    return { key: key, value: snap.data().value, shared: false };
+  // per-user Firestore storage: everything lives in ONE document so a login
+  // only ever needs a single read round-trip instead of several.
+  function appDataDocRef(){
+    return fbDb.collection('users').doc(state.user.uid).collection('store').doc('app-data');
   }
-  async function storeSet(key, value){
-    if (!state.user) throw new Error('로그인이 필요합니다');
-    var docRef = fbDb.collection('users').doc(state.user.uid).collection('store').doc(key);
-    await docRef.set({ value: value, updatedAt: Date.now() });
-    return { key: key, value: value, shared: false };
+  async function persistAppData(){
+    if (!state.user) return;
+    try {
+      await appDataDocRef().set({
+        materials: state.materials,
+        weights: state.weights,
+        bias: state.bias,
+        trained: state.trained,
+        tavilySettings: state.tavilySettings,
+        updatedAt: Date.now()
+      });
+    } catch(e){ /* best-effort background save */ }
   }
 
   function seedMaterials(){
@@ -416,64 +424,39 @@
   async function loadState(isNewUser){
     if (isNewUser){
       // brand-new account: nothing exists in Firestore yet, so skip the read
-      // round-trips (and their failure/catch delay) entirely and start from seed data.
+      // round-trip (and its failure/catch delay) entirely and start from seed data.
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
       state.tavilySettings = { apiKey: '' };
       state.loaded = true;
       render();
-      // persist in the background — no need to make the user wait on these writes
-      Promise.all([
-        storeSet('materials-store', JSON.stringify(state.materials)),
-        storeSet('learning-model', JSON.stringify({weights:state.weights,bias:state.bias,trained:state.trained})),
-        storeSet('tavily-settings', JSON.stringify(state.tavilySettings))
-      ]).catch(function(){});
+      persistAppData(); // background save, no need to make the user wait
       return;
     }
 
-    var results = await Promise.allSettled([
-      storeGet('materials-store'),
-      storeGet('learning-model'),
-      storeGet('tavily-settings')
-    ]);
-    var pendingSaves = [];
-
-    if (results[0].status === 'fulfilled'){
-      state.materials = JSON.parse(results[0].value.value);
-    } else {
+    try {
+      var snap = await appDataDocRef().get();
+      if (!snap.exists) throw new Error('no data yet');
+      var data = snap.data();
+      state.materials = data.materials || seedMaterials();
+      state.weights = data.weights || zeroWeights();
+      state.bias = typeof data.bias === 'number' ? data.bias : 0;
+      state.trained = data.trained || 0;
+      state.tavilySettings = data.tavilySettings || { apiKey: '' };
+    } catch(e){
       state.materials = seedMaterials();
-      pendingSaves.push(storeSet('materials-store', JSON.stringify(state.materials)));
-    }
-
-    if (results[1].status === 'fulfilled'){
-      var m = JSON.parse(results[1].value.value);
-      state.weights = m.weights; state.bias = m.bias; state.trained = m.trained;
-    } else {
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
-      pendingSaves.push(storeSet('learning-model', JSON.stringify({weights:state.weights,bias:state.bias,trained:state.trained})));
-    }
-
-    if (results[2].status === 'fulfilled'){
-      state.tavilySettings = JSON.parse(results[2].value.value);
-    } else {
       state.tavilySettings = { apiKey: '' };
-      // no saved key yet — nothing worth writing back for an empty default
+      persistAppData();
     }
 
     state.loaded = true;
     render();
-    if (pendingSaves.length) Promise.all(pendingSaves).catch(function(){});
   }
 
-  async function saveMaterials(){
-    try { await storeSet('materials-store', JSON.stringify(state.materials)); } catch(e){}
-  }
-  async function saveModel(){
-    try { await storeSet('learning-model', JSON.stringify({weights:state.weights,bias:state.bias,trained:state.trained})); } catch(e){}
-  }
-  async function saveTavilySettings(){
-    try { await storeSet('tavily-settings', JSON.stringify(state.tavilySettings)); } catch(e){}
-  }
+  async function saveMaterials(){ return persistAppData(); }
+  async function saveModel(){ return persistAppData(); }
+  async function saveTavilySettings(){ return persistAppData(); }
 
   function sigmoid(z){ return 1/(1+Math.exp(-z)); }
 
