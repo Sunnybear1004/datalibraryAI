@@ -281,6 +281,10 @@
   <div style="padding:60px 0;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--cream-soft);">서고를 여는 중...</div>
 </div></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+
 <script>
 (function(){
 
@@ -319,19 +323,45 @@
 
   function uid(){ return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-  // Works inside Claude artifacts (window.storage) AND standalone hosting like GitHub Pages (localStorage fallback)
-  var HAS_NATIVE_STORAGE = (typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function');
-  var LS_PREFIX = 'archive-desk:';
+  // ---------- Firebase (auth + per-user Firestore storage) ----------
+  var firebaseConfig = {
+    apiKey: "AIzaSyBNfW3wwTqpuWn4_oXGoll3BKlgwnn6G0I",
+    authDomain: "material-archive-439b5.firebaseapp.com",
+    databaseURL: "https://material-archive-439b5-default-rtdb.firebaseio.com",
+    projectId: "material-archive-439b5",
+    storageBucket: "material-archive-439b5.firebasestorage.app",
+    messagingSenderId: "757680195894",
+    appId: "1:757680195894:web:7b26d0d3a1e479e4cb4b97",
+    measurementId: "G-DK8N23R79X"
+  };
+  var fbAuth = null, fbDb = null, FIREBASE_READY = false;
 
+  function mapAuthError(err){
+    var code = err && err.code;
+    var map = {
+      'auth/user-not-found': '등록되지 않은 이메일이에요',
+      'auth/wrong-password': '비밀번호가 올바르지 않아요',
+      'auth/invalid-credential': '이메일 또는 비밀번호가 올바르지 않아요',
+      'auth/email-already-in-use': '이미 사용 중인 이메일이에요',
+      'auth/weak-password': '비밀번호는 6자 이상이어야 해요',
+      'auth/invalid-email': '이메일 형식이 올바르지 않아요',
+      'auth/network-request-failed': '네트워크 요청이 막혔어요. GitHub Pages 등 외부 호스팅에서 다시 시도해주세요.'
+    };
+    return map[code] || (err && err.message) || '알 수 없는 오류가 발생했어요';
+  }
+
+  // per-user Firestore-backed storage. Requires state.user to be set.
   async function storeGet(key){
-    if (HAS_NATIVE_STORAGE) return window.storage.get(key, false);
-    var raw = localStorage.getItem(LS_PREFIX + key);
-    if (raw === null) throw new Error('키 없음: ' + key);
-    return { key: key, value: raw, shared: false };
+    if (!state.user) throw new Error('로그인이 필요합니다');
+    var docRef = fbDb.collection('users').doc(state.user.uid).collection('store').doc(key);
+    var snap = await docRef.get();
+    if (!snap.exists) throw new Error('키 없음: ' + key);
+    return { key: key, value: snap.data().value, shared: false };
   }
   async function storeSet(key, value){
-    if (HAS_NATIVE_STORAGE) return window.storage.set(key, value, false);
-    localStorage.setItem(LS_PREFIX + key, value);
+    if (!state.user) throw new Error('로그인이 필요합니다');
+    var docRef = fbDb.collection('users').doc(state.user.uid).collection('store').doc(key);
+    await docRef.set({ value: value, updatedAt: Date.now() });
     return { key: key, value: value, shared: false };
   }
 
@@ -358,6 +388,11 @@
   }
 
   var state = {
+    authChecked: false,
+    user: null,
+    authView: 'login',
+    authError: null,
+    authLoading: false,
     loaded: false,
     materials: [],
     weights: {},
@@ -476,10 +511,79 @@
   }
 
   // ---------- rendering ----------
+  function loadingHtml(msg){
+    return '<div style="padding:80px 0;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--cream-soft);">' + escapeHtml(msg) + '</div>';
+  }
+
+  function firebaseErrorHtml(){
+    return '<div class="empty" style="height:auto;padding:40px 20px;">' +
+      '<h3>로그인 시스템을 불러오지 못했어요</h3>' +
+      '<p>Firebase 연결이 차단된 것 같아요. Claude 미리보기 화면에서는 외부 인증 서버 요청이 막혀 있을 수 있습니다. 이 파일을 GitHub Pages 등 외부 호스팅에 올린 뒤 다시 열어보세요.</p>' +
+      '</div>';
+  }
+
+  function authScreenHtml(){
+    var mode = state.authView;
+    var err = state.authError;
+    return '' +
+      '<div style="max-width:340px;margin:50px auto 0;">' +
+        '<div style="text-align:center;margin-bottom:26px;">' +
+          '<p class="eyebrow" style="color:var(--gold);font-family:var(--font-mono);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;margin:0 0 6px;">개인 자료 서고</p>' +
+          '<h1 style="font-family:var(--font-display);font-size:26px;margin:0;color:var(--cream);">' + (mode==='login' ? '로그인' : '회원가입') + '</h1>' +
+          '<div style="font-size:12px;color:var(--cream-soft);margin-top:6px;">계정마다 자신만의 평가 기록과 성향 분석이 저장돼요</div>' +
+        '</div>' +
+        '<div class="field"><label>이메일</label><input type="text" id="auth-email" placeholder="you@example.com" /></div>' +
+        '<div class="field"><label>비밀번호</label><input type="password" id="auth-pw" placeholder="6자 이상" /></div>' +
+        (err ? '<p style="color:var(--reject);font-size:12px;margin:-6px 0 14px;">' + escapeHtml(err) + '</p>' : '') +
+        '<button class="btn" id="auth-submit" style="width:100%;margin-bottom:10px;" ' + (state.authLoading?'disabled':'') + '>' + (state.authLoading ? '처리 중...' : (mode==='login' ? '로그인' : '계정 만들기')) + '</button>' +
+        '<button class="btn ghost small" id="auth-toggle" style="width:100%;">' + (mode==='login' ? '계정이 없으신가요? 회원가입' : '이미 계정이 있으신가요? 로그인') + '</button>' +
+      '</div>';
+  }
+
+  function attachAuthHandlers(){
+    var toggle = document.getElementById('auth-toggle');
+    if (toggle) toggle.addEventListener('click', function(){
+      state.authView = (state.authView === 'login') ? 'signup' : 'login';
+      state.authError = null;
+      render();
+    });
+    var submit = document.getElementById('auth-submit');
+    if (submit) submit.addEventListener('click', function(){
+      var email = document.getElementById('auth-email').value.trim();
+      var pw = document.getElementById('auth-pw').value;
+      if (!email || !pw){ state.authError = '이메일과 비밀번호를 입력해주세요'; render(); return; }
+      state.authLoading = true; state.authError = null; render();
+      var action = (state.authView === 'login')
+        ? fbAuth.signInWithEmailAndPassword(email, pw)
+        : fbAuth.createUserWithEmailAndPassword(email, pw);
+      action.then(function(){
+        state.authLoading = false;
+        // onAuthStateChanged handles loading data + re-rendering
+      }).catch(function(err){
+        state.authLoading = false;
+        state.authError = mapAuthError(err);
+        render();
+      });
+    });
+  }
+
   function render(){
     var app = document.getElementById('app-mount');
+    if (!state.authChecked){
+      app.innerHTML = loadingHtml('연결 확인 중...');
+      return;
+    }
+    if (!FIREBASE_READY){
+      app.innerHTML = firebaseErrorHtml();
+      return;
+    }
+    if (!state.user){
+      app.innerHTML = authScreenHtml();
+      attachAuthHandlers();
+      return;
+    }
     if (!state.loaded){
-      app.innerHTML = '<div style="padding:60px 0;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--cream-soft);">서고를 여는 중...</div>';
+      app.innerHTML = loadingHtml('서고를 여는 중...');
       return;
     }
     var approved = state.materials.filter(function(m){ return m.status==='approved'; });
@@ -487,6 +591,7 @@
     var pending = state.materials.filter(function(m){ return m.status==='pending'; });
 
     var html = '';
+    html += userBarHtml();
     html += headerHtml(approved.length, rejected.length, pending.length);
     html += tabsHtml();
     html += '<div id="tab-content">';
@@ -502,6 +607,15 @@
 
     app.innerHTML = html;
     attachHandlers(pending, approved, rejected);
+    var logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) logoutBtn.addEventListener('click', function(){ fbAuth.signOut(); });
+  }
+
+  function userBarHtml(){
+    return '<div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:8px;font-family:var(--font-mono);font-size:11px;color:var(--cream-soft);">' +
+      escapeHtml(state.user.email) +
+      '<button id="logout-btn" class="btn ghost small" style="padding:4px 10px;">로그아웃</button>' +
+    '</div>';
   }
 
   function headerHtml(a,r,p){
@@ -1138,6 +1252,39 @@
     });
   }
 
-  loadState();
+  function bootstrap(){
+    if (typeof firebase === 'undefined'){
+      FIREBASE_READY = false;
+      state.authChecked = true;
+      render();
+      return;
+    }
+    try {
+      firebase.initializeApp(firebaseConfig);
+      fbAuth = firebase.auth();
+      fbDb = firebase.firestore();
+      FIREBASE_READY = true;
+    } catch(e){
+      FIREBASE_READY = false;
+      state.authChecked = true;
+      render();
+      return;
+    }
+    fbAuth.onAuthStateChanged(function(user){
+      state.authChecked = true;
+      if (user){
+        state.user = { uid: user.uid, email: user.email };
+        state.authError = null;
+        loadState();
+      } else {
+        state.user = null;
+        state.loaded = false;
+        state.materials = [];
+        render();
+      }
+    });
+  }
+
+  bootstrap();
 })();
 </script>
