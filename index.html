@@ -413,30 +413,56 @@
     return w;
   }
 
-  async function loadState(){
-    try {
-      var res = await storeGet('materials-store');
-      state.materials = JSON.parse(res.value);
-    } catch(e){
+  async function loadState(isNewUser){
+    if (isNewUser){
+      // brand-new account: nothing exists in Firestore yet, so skip the read
+      // round-trips (and their failure/catch delay) entirely and start from seed data.
       state.materials = seedMaterials();
-      try { await storeSet('materials-store', JSON.stringify(state.materials)); } catch(e2){}
-    }
-    try {
-      var res2 = await storeGet('learning-model');
-      var m = JSON.parse(res2.value);
-      state.weights = m.weights; state.bias = m.bias; state.trained = m.trained;
-    } catch(e){
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
-      try { await storeSet('learning-model', JSON.stringify({weights:state.weights,bias:state.bias,trained:state.trained})); } catch(e2){}
+      state.tavilySettings = { apiKey: '' };
+      state.loaded = true;
+      render();
+      // persist in the background — no need to make the user wait on these writes
+      Promise.all([
+        storeSet('materials-store', JSON.stringify(state.materials)),
+        storeSet('learning-model', JSON.stringify({weights:state.weights,bias:state.bias,trained:state.trained})),
+        storeSet('tavily-settings', JSON.stringify(state.tavilySettings))
+      ]).catch(function(){});
+      return;
     }
-    try {
-      var res3 = await storeGet('tavily-settings');
-      state.tavilySettings = JSON.parse(res3.value);
-    } catch(e){
-      // no saved key yet, keep default
+
+    var results = await Promise.allSettled([
+      storeGet('materials-store'),
+      storeGet('learning-model'),
+      storeGet('tavily-settings')
+    ]);
+    var pendingSaves = [];
+
+    if (results[0].status === 'fulfilled'){
+      state.materials = JSON.parse(results[0].value.value);
+    } else {
+      state.materials = seedMaterials();
+      pendingSaves.push(storeSet('materials-store', JSON.stringify(state.materials)));
     }
+
+    if (results[1].status === 'fulfilled'){
+      var m = JSON.parse(results[1].value.value);
+      state.weights = m.weights; state.bias = m.bias; state.trained = m.trained;
+    } else {
+      state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
+      pendingSaves.push(storeSet('learning-model', JSON.stringify({weights:state.weights,bias:state.bias,trained:state.trained})));
+    }
+
+    if (results[2].status === 'fulfilled'){
+      state.tavilySettings = JSON.parse(results[2].value.value);
+    } else {
+      state.tavilySettings = { apiKey: '' };
+      // no saved key yet — nothing worth writing back for an empty default
+    }
+
     state.loaded = true;
     render();
+    if (pendingSaves.length) Promise.all(pendingSaves).catch(function(){});
   }
 
   async function saveMaterials(){
@@ -1275,7 +1301,11 @@
       if (user){
         state.user = { uid: user.uid, email: user.email };
         state.authError = null;
-        loadState();
+        var isNewUser = false;
+        try {
+          isNewUser = !!(user.metadata && user.metadata.creationTime === user.metadata.lastSignInTime);
+        } catch(e){ isNewUser = false; }
+        loadState(isNewUser);
       } else {
         state.user = null;
         state.loaded = false;
