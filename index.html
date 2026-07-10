@@ -356,22 +356,34 @@
 
   // per-user Firestore storage: everything lives in ONE document so a login
   // only ever needs a single read round-trip instead of several.
-  function appDataDocRef(){
-    return fbDb.collection('users').doc(state.user.uid).collection('store').doc('app-data');
+  function appDataDocRef(uidOverride){
+    return fbDb.collection('users').doc(uidOverride || state.user.uid).collection('store').doc('app-data');
   }
-  async function persistAppData(){
-    if (!state.user) return;
-    try {
-      await appDataDocRef().set({
-        materials: state.materials,
-        weights: state.weights,
-        bias: state.bias,
-        trained: state.trained,
-        tavilySettings: state.tavilySettings,
-        updatedAt: Date.now()
-      });
-    } catch(e){ /* best-effort background save */ }
+  // Saves are queued (not fire-and-forget) so that a) writes for the same
+  // account always land in the order they were made, and b) logout can wait
+  // for the queue to drain before the session actually switches — otherwise
+  // an in-flight write can silently fail once the auth token changes,
+  // making a just-classified card look like it "reverted to pending".
+  var saveQueue = Promise.resolve();
+  function persistAppData(){
+    if (!state.user) return Promise.resolve();
+    var uidAtCallTime = state.user.uid;
+    var payload = {
+      materials: state.materials,
+      weights: state.weights,
+      bias: state.bias,
+      trained: state.trained,
+      tavilySettings: state.tavilySettings,
+      updatedAt: Date.now()
+    };
+    saveQueue = saveQueue.then(function(){
+      return appDataDocRef(uidAtCallTime).set(payload);
+    }).catch(function(e){
+      showToast('저장에 실패했어요. 네트워크 연결을 확인해주세요.');
+    });
+    return saveQueue;
   }
+
 
   function seedMaterials(){
     var now = Date.now();
@@ -617,7 +629,15 @@
     app.innerHTML = html;
     attachHandlers(pending, approved, rejected);
     var logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) logoutBtn.addEventListener('click', function(){ fbAuth.signOut(); });
+    if (logoutBtn) logoutBtn.addEventListener('click', function(){
+      logoutBtn.disabled = true;
+      logoutBtn.textContent = '저장 확인 중...';
+      Promise.resolve(saveQueue).then(function(){
+        return fbAuth.signOut();
+      }).catch(function(){
+        return fbAuth.signOut();
+      });
+    });
   }
 
   function userBarHtml(){
@@ -1281,6 +1301,7 @@
     }
     fbAuth.onAuthStateChanged(function(user){
       state.authChecked = true;
+      saveQueue = Promise.resolve();
       if (user){
         state.user = { uid: user.uid, email: user.email };
         state.authError = null;
