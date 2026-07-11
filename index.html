@@ -327,6 +327,7 @@
     compare: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3v14M17 21V7" stroke-linecap="round"/><path d="M3 8l4-5 4 5M20 16l-4 5-4-5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     profile: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19l4-11 4 11M6 15h4"/><path d="M15 10l2-5 2 5M14.5 13h5"/></svg>',
     bulk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h11M4 12h7M4 18h7" stroke-linecap="round"/><path d="M17 14v6M14 17h6" stroke-linecap="round"/></svg>',
+    settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.3.9a7.6 7.6 0 0 0-1.7-1l-.3-2.5H9.9l-.3 2.5a7.6 7.6 0 0 0-1.7 1l-2.3-.9-2 3.4L5.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.3-.9a7.6 7.6 0 0 0 1.7 1l.3 2.5h4.2l.3-2.5a7.6 7.6 0 0 0 1.7-1l2.3.9 2-3.4z"/></svg>',
     heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20s-7-4.35-9.5-8.5C1 8.5 2.5 5 6 5c2 0 3.3 1.2 4 2.2C10.7 6.2 12 5 14 5c3.5 0 5 3.5 3.5 6.5C19 15.65 12 20 12 20z"/></svg>',
     x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>'
   };
@@ -648,6 +649,7 @@
     else if (state.tab === 'rejected') html += rejectedTabHtml(rejected);
     else if (state.tab === 'compare') html += compareTabHtml(approved);
     else if (state.tab === 'profile') html += profileTabHtml(approved, rejected, pending);
+    else if (state.tab === 'settings') html += settingsTabHtml();
     html += '</div>';
     if (state.pendingReject) html += reasonModalHtml();
     if (state.toast) html += '<div class="toast" id="toast-el">' + escapeHtml(state.toast) + '</div>';
@@ -695,7 +697,8 @@
       { id:'bulk', label:'대량 추가', icon: ICONS.bulk },
       { id:'rejected', label:'반려 자료함', icon: ICONS.archive },
       { id:'compare', label:'상대 비교', icon: ICONS.compare },
-      { id:'profile', label:'성향 분석', icon: ICONS.profile }
+      { id:'profile', label:'성향 분석', icon: ICONS.profile },
+      { id:'settings', label:'설정', icon: ICONS.settings }
     ];
     var html = '<div class="tabs">';
     tabs.forEach(function(t){
@@ -1047,7 +1050,11 @@
       });
     }
 
-    html += '<p class="section-title">데이터 관리</p><button class="btn ghost small" id="reset-all">모든 데이터 초기화</button>';
+    return html;
+  }
+
+  function settingsTabHtml(){
+    var html = '<p class="section-title">데이터 관리</p><button class="btn ghost small" id="reset-all">모든 데이터 초기화</button>';
 
     html += '<p class="section-title">계정 관리</p>';
     html += '<div style="font-size:12px;color:var(--cream-soft);margin-bottom:14px;">현재 로그인: <b style="color:var(--gold);">' + escapeHtml(state.user ? state.user.email : '') + '</b></div>';
