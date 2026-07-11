@@ -252,6 +252,12 @@
   #archive-root .rec-item .t .f { display: block; font-family: var(--font-mono); font-size: 10px; color: var(--cream-soft); text-transform: uppercase; margin-top: 2px; }
   #archive-root .rec-item .pct { font-family: var(--font-mono); color: var(--gold); font-weight: 600; }
   #archive-root .dist-row { display: flex; justify-content: space-between; font-size: 12px; padding: 6px 0; border-bottom: 1px solid var(--line-dark); }
+  #archive-root .acct-block { border: 1px solid var(--line-dark); border-radius: 4px; padding: 16px; margin-bottom: 14px; }
+  #archive-root .acct-block.acct-danger { border-color: rgba(181,87,63,0.4); }
+  #archive-root .acct-label { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold); margin-bottom: 12px; }
+  #archive-root .acct-msg { font-size: 12px; margin: -4px 0 12px; }
+  #archive-root .acct-msg.ok { color: var(--approve); }
+  #archive-root .acct-msg.err { color: var(--reject); }
 
   #archive-root .toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--paper); color: var(--ink);
@@ -349,7 +355,9 @@
       'auth/email-already-in-use': '이미 사용 중인 이메일이에요',
       'auth/weak-password': '비밀번호는 6자 이상이어야 해요',
       'auth/invalid-email': '이메일 형식이 올바르지 않아요',
-      'auth/network-request-failed': '네트워크 요청이 막혔어요. GitHub Pages 등 외부 호스팅에서 다시 시도해주세요.'
+      'auth/network-request-failed': '네트워크 요청이 막혔어요. GitHub Pages 등 외부 호스팅에서 다시 시도해주세요.',
+      'auth/requires-recent-login': '보안을 위해 현재 비밀번호 확인이 필요해요',
+      'auth/too-many-requests': '시도가 너무 많아요. 잠시 후 다시 시도해주세요.'
     };
     return map[code] || (err && err.message) || '알 수 없는 오류가 발생했어요';
   }
@@ -359,14 +367,28 @@
   function appDataDocRef(uidOverride){
     return fbDb.collection('users').doc(uidOverride || state.user.uid).collection('store').doc('app-data');
   }
-  // Saves are queued (not fire-and-forget) so that a) writes for the same
-  // account always land in the order they were made, and b) logout can wait
-  // for the queue to drain before the session actually switches — otherwise
-  // an in-flight write can silently fail once the auth token changes,
-  // making a just-classified card look like it "reverted to pending".
-  var saveQueue = Promise.resolve();
+  // Coalescing save: if a write is already in flight when another change
+  // comes in, we don't queue a second full round-trip — we just flag
+  // "there's newer state" and, once the in-flight write finishes, send ONE
+  // follow-up write with whatever is current. This keeps logout's wait time
+  // bounded to ~1 write no matter how many swipes happened right before it,
+  // while still guaranteeing the latest state actually reaches the server
+  // before the session switches (so a just-classified card can't silently
+  // revert once the auth token changes).
+  var savingInFlight = false;
+  var saveDirty = false;
+  var currentSavePromise = Promise.resolve();
+
   function persistAppData(){
     if (!state.user) return Promise.resolve();
+    saveDirty = true;
+    if (savingInFlight) return currentSavePromise;
+    return runSave();
+  }
+
+  function runSave(){
+    savingInFlight = true;
+    saveDirty = false;
     var uidAtCallTime = state.user.uid;
     var payload = {
       materials: state.materials,
@@ -376,12 +398,13 @@
       tavilySettings: state.tavilySettings,
       updatedAt: Date.now()
     };
-    saveQueue = saveQueue.then(function(){
-      return appDataDocRef(uidAtCallTime).set(payload);
-    }).catch(function(e){
-      showToast('저장에 실패했어요. 네트워크 연결을 확인해주세요.');
-    });
-    return saveQueue;
+    currentSavePromise = appDataDocRef(uidAtCallTime).set(payload)
+      .catch(function(e){ showToast('저장에 실패했어요. 네트워크 연결을 확인해주세요.'); })
+      .then(function(){
+        savingInFlight = false;
+        if (saveDirty) return runSave();
+      });
+    return currentSavePromise;
   }
 
 
@@ -424,7 +447,10 @@
     compare: { mode:'free', field:'all', a:null, b:null, critAnswers:{}, overall:null },
     bulk: { mode: 'urls' },
     tavilySettings: { apiKey: '' },
-    rejFilter: 'all'
+    rejFilter: 'all',
+    acctEmailMsg: null, acctEmailLoading: false,
+    acctPwMsg: null, acctPwLoading: false,
+    acctDeleteMsg: null, acctDeleteLoading: false
   };
 
   function zeroWeights(){
@@ -632,7 +658,10 @@
     if (logoutBtn) logoutBtn.addEventListener('click', function(){
       logoutBtn.disabled = true;
       logoutBtn.textContent = '저장 확인 중...';
-      Promise.resolve(saveQueue).then(function(){
+      Promise.resolve(currentSavePromise).then(function(){
+        // if a save became dirty again right as we were about to leave, wait once more
+        return saveDirty ? currentSavePromise : null;
+      }).then(function(){
         return fbAuth.signOut();
       }).catch(function(){
         return fbAuth.signOut();
@@ -1019,6 +1048,28 @@
     }
 
     html += '<p class="section-title">데이터 관리</p><button class="btn ghost small" id="reset-all">모든 데이터 초기화</button>';
+
+    html += '<p class="section-title">계정 관리</p>';
+    html += '<div style="font-size:12px;color:var(--cream-soft);margin-bottom:14px;">현재 로그인: <b style="color:var(--gold);">' + escapeHtml(state.user ? state.user.email : '') + '</b></div>';
+
+    html += '<div class="acct-block"><div class="acct-label">이메일 변경</div>' +
+      '<div class="field"><label>새 이메일</label><input type="text" id="acct-new-email" placeholder="new@example.com" /></div>' +
+      '<div class="field"><label>현재 비밀번호 (확인용)</label><input type="password" id="acct-email-pw" /></div>' +
+      (state.acctEmailMsg ? '<p class="acct-msg ' + state.acctEmailMsg.type + '">' + escapeHtml(state.acctEmailMsg.text) + '</p>' : '') +
+      '<button class="btn ghost small" id="acct-email-submit" ' + (state.acctEmailLoading?'disabled':'') + '>' + (state.acctEmailLoading ? '처리 중...' : '이메일 변경하기') + '</button></div>';
+
+    html += '<div class="acct-block"><div class="acct-label">비밀번호 변경</div>' +
+      '<div class="field"><label>현재 비밀번호</label><input type="password" id="acct-cur-pw" /></div>' +
+      '<div class="field"><label>새 비밀번호 (6자 이상)</label><input type="password" id="acct-new-pw" /></div>' +
+      (state.acctPwMsg ? '<p class="acct-msg ' + state.acctPwMsg.type + '">' + escapeHtml(state.acctPwMsg.text) + '</p>' : '') +
+      '<button class="btn ghost small" id="acct-pw-submit" ' + (state.acctPwLoading?'disabled':'') + '>' + (state.acctPwLoading ? '처리 중...' : '비밀번호 변경하기') + '</button></div>';
+
+    html += '<div class="acct-block acct-danger"><div class="acct-label" style="color:var(--reject);">회원 탈퇴</div>' +
+      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 10px;">계정과 함께 저장된 모든 자료·학습 데이터가 영구히 삭제됩니다.</p>' +
+      '<div class="field"><label>현재 비밀번호</label><input type="password" id="acct-del-pw" /></div>' +
+      (state.acctDeleteMsg ? '<p class="acct-msg ' + state.acctDeleteMsg.type + '">' + escapeHtml(state.acctDeleteMsg.text) + '</p>' : '') +
+      '<button class="btn ghost small" id="acct-delete-submit" style="border-color:var(--reject);color:var(--reject);" ' + (state.acctDeleteLoading?'disabled':'') + '>' + (state.acctDeleteLoading ? '처리 중...' : '계정 영구 삭제') + '</button></div>';
+
     return html;
   }
 
@@ -1279,6 +1330,76 @@
       state.tab = 'swipe';
       render();
     });
+
+    // account management
+    function reauthenticate(currentPassword){
+      var cred = firebase.auth.EmailAuthProvider.credential(state.user.email, currentPassword);
+      return fbAuth.currentUser.reauthenticateWithCredential(cred);
+    }
+
+    var acctEmailBtn = document.getElementById('acct-email-submit');
+    if (acctEmailBtn) acctEmailBtn.addEventListener('click', function(){
+      var newEmail = document.getElementById('acct-new-email').value.trim();
+      var pw = document.getElementById('acct-email-pw').value;
+      if (!newEmail || !pw){ state.acctEmailMsg = { type:'err', text:'새 이메일과 현재 비밀번호를 입력해주세요' }; render(); return; }
+      state.acctEmailLoading = true; state.acctEmailMsg = null; render();
+      reauthenticate(pw).then(function(){
+        return fbAuth.currentUser.updateEmail(newEmail);
+      }).then(function(){
+        state.user.email = newEmail;
+        state.acctEmailLoading = false;
+        state.acctEmailMsg = { type:'ok', text:'이메일이 변경됐어요' };
+        render();
+      }).catch(function(err){
+        state.acctEmailLoading = false;
+        state.acctEmailMsg = { type:'err', text: mapAuthError(err) };
+        render();
+      });
+    });
+
+    var acctPwBtn = document.getElementById('acct-pw-submit');
+    if (acctPwBtn) acctPwBtn.addEventListener('click', function(){
+      var curPw = document.getElementById('acct-cur-pw').value;
+      var newPw = document.getElementById('acct-new-pw').value;
+      if (!curPw || !newPw){ state.acctPwMsg = { type:'err', text:'현재 비밀번호와 새 비밀번호를 입력해주세요' }; render(); return; }
+      if (newPw.length < 6){ state.acctPwMsg = { type:'err', text:'새 비밀번호는 6자 이상이어야 해요' }; render(); return; }
+      state.acctPwLoading = true; state.acctPwMsg = null; render();
+      reauthenticate(curPw).then(function(){
+        return fbAuth.currentUser.updatePassword(newPw);
+      }).then(function(){
+        state.acctPwLoading = false;
+        state.acctPwMsg = { type:'ok', text:'비밀번호가 변경됐어요' };
+        render();
+      }).catch(function(err){
+        state.acctPwLoading = false;
+        state.acctPwMsg = { type:'err', text: mapAuthError(err) };
+        render();
+      });
+    });
+
+    var acctDeleteBtn = document.getElementById('acct-delete-submit');
+    if (acctDeleteBtn) acctDeleteBtn.addEventListener('click', function(){
+      var pw = document.getElementById('acct-del-pw').value;
+      if (!pw){ state.acctDeleteMsg = { type:'err', text:'현재 비밀번호를 입력해주세요' }; render(); return; }
+      if (!confirm('정말 계정을 삭제할까요? 저장된 모든 자료와 학습 데이터가 영구히 사라지고 되돌릴 수 없습니다.')) return;
+      state.acctDeleteLoading = true; state.acctDeleteMsg = null; render();
+      var uidToDelete = state.user.uid;
+      reauthenticate(pw).then(function(){
+        return fbDb.collection('users').doc(uidToDelete).collection('store').get();
+      }).then(function(snap){
+        var batch = fbDb.batch();
+        snap.forEach(function(doc){ batch.delete(doc.ref); });
+        return batch.commit();
+      }).then(function(){
+        return fbAuth.currentUser.delete();
+      }).then(function(){
+        // onAuthStateChanged fires with null user and returns to the login screen
+      }).catch(function(err){
+        state.acctDeleteLoading = false;
+        state.acctDeleteMsg = { type:'err', text: mapAuthError(err) };
+        render();
+      });
+    });
   }
 
   function bootstrap(){
@@ -1301,7 +1422,9 @@
     }
     fbAuth.onAuthStateChanged(function(user){
       state.authChecked = true;
-      saveQueue = Promise.resolve();
+      savingInFlight = false;
+      saveDirty = false;
+      currentSavePromise = Promise.resolve();
       if (user){
         state.user = { uid: user.uid, email: user.email };
         state.authError = null;
@@ -1314,6 +1437,8 @@
         state.user = null;
         state.loaded = false;
         state.materials = [];
+        state.acctEmailMsg = null; state.acctPwMsg = null; state.acctDeleteMsg = null;
+        state.acctEmailLoading = false; state.acctPwLoading = false; state.acctDeleteLoading = false;
         render();
       }
     });
