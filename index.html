@@ -380,6 +380,23 @@
   var saveDirty = false;
   var currentSavePromise = Promise.resolve();
 
+  // Resolves with 'done' when the given promise settles, or 'timeout' after
+  // ms milliseconds — whichever comes first. Used so logout never has to
+  // wait indefinitely on a slow save.
+  function withTimeout(promise, ms){
+    return new Promise(function(resolve){
+      var settled = false;
+      var timer = setTimeout(function(){
+        if (!settled){ settled = true; resolve('timeout'); }
+      }, ms);
+      Promise.resolve(promise).then(function(){
+        if (!settled){ settled = true; clearTimeout(timer); resolve('done'); }
+      }, function(){
+        if (!settled){ settled = true; clearTimeout(timer); resolve('done'); }
+      });
+    });
+  }
+
   function persistAppData(){
     if (!state.user) return Promise.resolve();
     saveDirty = true;
@@ -660,10 +677,16 @@
     if (logoutBtn) logoutBtn.addEventListener('click', function(){
       logoutBtn.disabled = true;
       logoutBtn.textContent = '저장 확인 중...';
-      Promise.resolve(currentSavePromise).then(function(){
+      var waitForSave = Promise.resolve(currentSavePromise).then(function(){
         // if a save became dirty again right as we were about to leave, wait once more
         return saveDirty ? currentSavePromise : null;
-      }).then(function(){
+      });
+      // Don't let logout hang forever on a slow connection — give the save
+      // a few seconds to finish, then log out anyway rather than stall the UI.
+      withTimeout(waitForSave, 3000).then(function(result){
+        if (result === 'timeout'){
+          showToast('저장이 지연되고 있어 우선 로그아웃했어요. 방금 변경사항은 다시 로그인 후 확인해주세요.');
+        }
         return fbAuth.signOut();
       }).catch(function(){
         return fbAuth.signOut();
