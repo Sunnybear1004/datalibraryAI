@@ -469,7 +469,7 @@
     toast: null,
     compare: { mode:'free', field:'all', a:null, b:null, critAnswers:{}, overall:null },
     bulk: { mode: 'urls' },
-    home: { engine: 'claude', field: '과학', count: 5, loading: false, statusMsg: null, lastAdded: [] },
+    home: { engine: 'claude', field: '', keyword: '', count: 5, loading: false, statusMsg: null, lastAdded: [] },
     tavilySettings: { apiKey: '' },
     rejFilter: 'all',
     acctEmailMsg: null, acctEmailLoading: false,
@@ -779,7 +779,8 @@
 
   function homeTabHtml(approved, rejected, pending){
     var h = state.home;
-    var fieldOptions = Object.keys(FIELD_TREE).map(function(f){ return '<option value="'+f+'" '+(h.field===f?'selected':'')+'>'+f+'</option>'; }).join('');
+    var fieldOptions = '<option value="" ' + (h.field ? '' : 'selected') + '>자동 (학습된 선호 분야 사용)</option>' +
+      Object.keys(FIELD_TREE).map(function(f){ return '<option value="'+f+'" '+(h.field===f?'selected':'')+'>'+f+'</option>'; }).join('');
     var hasProfile = state.trained > 0 && approved.length > 0;
     var brief = buildProfileBrief(approved, h.field);
 
@@ -799,13 +800,18 @@
     } else {
       html += '<div class="empty" style="height:auto;padding:24px 20px;margin-bottom:18px;">' +
         '<h3>아직 학습된 성향이 없어요</h3>' +
-        '<p>카드 평가를 몇 개 진행하면 여기서 그 성향에 맞춰 자료를 자동으로 찾아드려요. 지금은 아래에서 분야를 직접 골라 시작할 수 있어요.</p>' +
+        '<p>카드 평가를 몇 개 진행하면 여기서 그 성향에 맞춰 자료를 자동으로 찾아드려요. 지금은 아래에서 키워드나 분야를 직접 정해서 시작할 수 있어요.</p>' +
         '<button class="btn" data-goto="swipe">카드 평가하러 가기</button>' +
-        '</div>' +
-        '<div class="field" style="max-width:260px;"><label>시작할 분야</label><select id="home-field">' + fieldOptions + '</select></div>';
+        '</div>';
     }
 
-    html += '<div class="compare-controls" style="margin-top:18px;"><div class="mode-toggle">' +
+    html += '<div class="field-row">' +
+      '<div class="field"><label>키워드 (선택)</label><input type="text" id="home-keyword" placeholder="예: 양자컴퓨팅, 금리 인상" value="' + escapeHtml(h.keyword||'') + '" /></div>' +
+      '<div class="field"><label>분야</label><select id="home-field">' + fieldOptions + '</select></div>' +
+    '</div>' +
+    '<p style="font-size:12px;color:var(--cream-soft);margin:-8px 0 16px;">키워드를 비워두면 학습된 성향만으로, 입력하면 그 키워드를 성향과 함께 반영해서 찾아요.</p>';
+
+    html += '<div class="compare-controls"><div class="mode-toggle">' +
       '<button data-homeengine="claude" class="' + (h.engine==='claude'?'active':'') + '">Claude로 찾기</button>' +
       '<button data-homeengine="tavily" class="' + (h.engine==='tavily'?'active':'') + '">Tavily로 찾기</button>' +
     '</div></div>';
@@ -1032,7 +1038,7 @@
   // Builds a human-readable brief of the user's learned profile, used both to
   // drive the search itself and to show the person what's being used.
   function buildProfileBrief(approved, manualField){
-    var field = topFieldByApproval(approved) || manualField;
+    var field = manualField || topFieldByApproval(approved);
     var criteria = topCriteriaByWeight(3);
     var topFitTitles = approved.slice()
       .sort(function(a,b){ return predictFit(b) - predictFit(a); })
@@ -1041,7 +1047,7 @@
     return { field: field, criteria: criteria, sampleTitles: topFitTitles };
   }
 
-  async function collectByProfile(brief, count){
+  async function collectByProfile(brief, count, keyword){
     var fieldsList = Object.keys(FIELD_TREE).join(', ');
     var criteriaText = brief.criteria.length
       ? brief.criteria.map(function(c){ return c.label; }).join(', ')
@@ -1049,11 +1055,16 @@
     var samplesText = brief.sampleTitles.length
       ? brief.sampleTitles.map(function(t){ return '- ' + t; }).join('\n')
       : '(아직 평가 이력 없음)';
+    var keywordLine = keyword ? '- 사용자가 지금 지정한 키워드: "' + keyword + '" (이 주제를 우선적으로 반영해줘)\n' : '';
+    var taskLine = keyword
+      ? '"' + keyword + '"와 관련된 자료 중에서, 위 프로필(선호 분야·평가 기준)에 잘 맞을 만한 것을 웹에서 검색해서 최대 ' + count + '개 찾아줘.'
+      : '이 프로필에 맞는 새로운 자료(뉴스 기사, 논문, 보고서 등)를 웹에서 검색해서 최대 ' + count + '개 찾아줘. 위 예시와 완전히 같은 주제만 반복하지 말고, 같은 취향 안에서 다양하게 골라줘.';
     var prompt = '다음은 한 사용자의 자료 평가 성향 프로필이야.\n' +
       '- 선호 분야: ' + (brief.field || '미정 — 다양한 분야 중 흥미로운 것') + '\n' +
       '- 중요하게 여기는 평가 기준(가중치 높은 순): ' + criteriaText + '\n' +
+      keywordLine +
       '- 최근 높게 평가한 자료 예시:\n' + samplesText + '\n\n' +
-      '이 프로필에 맞는 새로운 자료(뉴스 기사, 논문, 보고서 등)를 웹에서 검색해서 최대 ' + count + '개 찾아줘. 위 예시와 완전히 같은 주제만 반복하지 말고, 같은 취향 안에서 다양하게 골라줘.\n\n' +
+      taskLine + '\n\n' +
       '각 자료에 대해 아래 JSON 스키마로만 응답해. 설명, 마크다운, 코드펜스 없이 순수 JSON 배열만 출력해.\n' +
       '[{"title":"자료 제목","source":"출처(언론사/저널명 등)","url":"실제 검색으로 확인한 URL","field":"다음 중 하나: ' + fieldsList + '",' +
       '"matchReason":"이 자료를 고른 이유를 한 문장으로 (예: 전문성과 신뢰성이 높은 자료라서)",' +
@@ -1078,7 +1089,12 @@
     return arr;
   }
 
-  function buildTavilyQuery(brief){
+  function buildTavilyQuery(brief, keyword){
+    if (keyword) {
+      var kwParts = [keyword];
+      if (brief.field) kwParts.push(brief.field);
+      return kwParts.join(' ');
+    }
     var parts = [];
     if (brief.field) parts.push(brief.field);
     if (brief.sampleTitles.length) parts = parts.concat(extractKeywords(brief.sampleTitles[0], 3));
@@ -1361,17 +1377,21 @@
     if (homeFieldEl) homeFieldEl.addEventListener('change', function(){ state.home.field = homeFieldEl.value; });
     var homeCountEl = document.getElementById('home-count');
     if (homeCountEl) homeCountEl.addEventListener('change', function(){ state.home.count = homeCountEl.value; });
+    var homeKeywordEl = document.getElementById('home-keyword');
+    if (homeKeywordEl) homeKeywordEl.addEventListener('change', function(){ state.home.keyword = homeKeywordEl.value; });
 
     var homeCollectBtn = document.getElementById('home-collect');
     if (homeCollectBtn) homeCollectBtn.addEventListener('click', function(){
       var countRaw = parseInt(document.getElementById('home-count').value, 10);
       var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(10, countRaw));
       var manualField = document.getElementById('home-field') ? document.getElementById('home-field').value : state.home.field;
+      var keyword = document.getElementById('home-keyword') ? document.getElementById('home-keyword').value.trim() : (state.home.keyword || '');
       state.home.field = manualField;
+      state.home.keyword = keyword;
       var brief = buildProfileBrief(approved, manualField);
 
       state.home.loading = true;
-      state.home.statusMsg = '당신의 프로필에 맞는 자료를 찾고 있어요...';
+      state.home.statusMsg = keyword ? ('"' + keyword + '"와(과) 당신의 프로필을 함께 반영해서 찾고 있어요...') : '당신의 프로필에 맞는 자료를 찾고 있어요...';
       render();
 
       function finishSuccess(created){
@@ -1389,7 +1409,7 @@
       }
 
       if (state.home.engine === 'claude'){
-        collectByProfile(brief, count).then(function(arr){
+        collectByProfile(brief, count, keyword).then(function(arr){
           var created = arr.map(function(item){
             var field = FIELD_TREE.hasOwnProperty(item.field) ? item.field : (brief.field || Object.keys(FIELD_TREE)[0]);
             var scores = {};
@@ -1406,7 +1426,7 @@
         if (!apiKey){ state.home.loading = false; state.home.statusMsg = 'Tavily API 키를 입력해주세요'; render(); return; }
         state.tavilySettings = { apiKey: apiKey };
         saveTavilySettings();
-        var query = buildTavilyQuery(brief);
+        var query = buildTavilyQuery(brief, keyword);
         tavilySearch(apiKey, query, count).then(function(items){
           var created = items.map(function(it){
             var scores = {};
