@@ -1353,6 +1353,73 @@
       document.getElementById('f-url').value='';
     });
 
+    // home tab
+    document.querySelectorAll('[data-homeengine]').forEach(function(btn){
+      btn.addEventListener('click', function(){ state.home.engine = btn.getAttribute('data-homeengine'); render(); });
+    });
+    var homeFieldEl = document.getElementById('home-field');
+    if (homeFieldEl) homeFieldEl.addEventListener('change', function(){ state.home.field = homeFieldEl.value; });
+    var homeCountEl = document.getElementById('home-count');
+    if (homeCountEl) homeCountEl.addEventListener('change', function(){ state.home.count = homeCountEl.value; });
+
+    var homeCollectBtn = document.getElementById('home-collect');
+    if (homeCollectBtn) homeCollectBtn.addEventListener('click', function(){
+      var countRaw = parseInt(document.getElementById('home-count').value, 10);
+      var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(10, countRaw));
+      var manualField = document.getElementById('home-field') ? document.getElementById('home-field').value : state.home.field;
+      state.home.field = manualField;
+      var brief = buildProfileBrief(approved, manualField);
+
+      state.home.loading = true;
+      state.home.statusMsg = '당신의 프로필에 맞는 자료를 찾고 있어요...';
+      render();
+
+      function finishSuccess(created){
+        state.materials = state.materials.concat(created);
+        saveMaterials();
+        state.home.loading = false;
+        state.home.lastAdded = created;
+        state.home.statusMsg = created.length + '개 자료를 찾아서 카드 평가 목록에 추가했어요';
+        render();
+      }
+      function finishError(err, hint){
+        state.home.loading = false;
+        state.home.statusMsg = '자료를 찾지 못했어요: ' + (err && err.message ? err.message : '알 수 없는 오류') + (hint ? ' (' + hint + ')' : '');
+        render();
+      }
+
+      if (state.home.engine === 'claude'){
+        collectByProfile(brief, count).then(function(arr){
+          var created = arr.map(function(item){
+            var field = FIELD_TREE.hasOwnProperty(item.field) ? item.field : (brief.field || Object.keys(FIELD_TREE)[0]);
+            var scores = {};
+            CRITERIA.forEach(function(c){
+              var v = item.scores && typeof item.scores[c.key] === 'number' ? item.scores[c.key] : 60;
+              scores[c.key] = Math.max(0, Math.min(100, Math.round(v)));
+            });
+            return { id: uid(), title: item.title || '제목 없음', field: field, subfield: null, source: item.source || '미상', url: item.url || null, matchReason: item.matchReason || null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
+          });
+          finishSuccess(created);
+        }).catch(function(err){ finishError(err); });
+      } else {
+        var apiKey = document.getElementById('home-tavily-key') ? document.getElementById('home-tavily-key').value.trim() : (state.tavilySettings.apiKey || '');
+        if (!apiKey){ state.home.loading = false; state.home.statusMsg = 'Tavily API 키를 입력해주세요'; render(); return; }
+        state.tavilySettings = { apiKey: apiKey };
+        saveTavilySettings();
+        var query = buildTavilyQuery(brief);
+        tavilySearch(apiKey, query, count).then(function(items){
+          var created = items.map(function(it){
+            var scores = {};
+            CRITERIA.forEach(function(c){ scores[c.key] = 60; });
+            var host = null;
+            try { host = new URL(it.url).hostname.replace(/^www\./,''); } catch(e){ host = null; }
+            return { id: uid(), title: it.title || query, field: brief.field || Object.keys(FIELD_TREE)[0], subfield: null, source: host || '미상', url: it.url || null, matchReason: null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
+          });
+          finishSuccess(created);
+        }).catch(function(err){ finishError(err, '네트워크 또는 키를 확인해주세요'); });
+      }
+    });
+
     // bulk add tab
     document.querySelectorAll('[data-bulkmode]').forEach(function(btn){
       btn.addEventListener('click', function(){ state.bulk.mode = btn.getAttribute('data-bulkmode'); render(); });
