@@ -212,6 +212,8 @@
     background: transparent; border: none; color: var(--cream-soft); padding: 7px 16px; font-size: 12px; font-family: var(--font-mono);
   }
   #archive-root .mode-toggle button.active { background: var(--gold); color: var(--bg-deep); }
+  #archive-root .mode-toggle button.locked { color: var(--paper-line); }
+  #archive-root .mode-toggle button.locked:hover { color: var(--reject); }
   #archive-root .compare-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
   #archive-root .compare-card {
     background: var(--paper); color: var(--ink); border-radius: 4px; padding: 16px; position: relative;
@@ -780,6 +782,8 @@
 
   function homeTabHtml(approved, rejected, pending){
     var h = state.home;
+    var hasTavilyKey = !!(state.tavilySettings && state.tavilySettings.apiKey);
+    if (h.engine === 'tavily' && !hasTavilyKey) h.engine = 'claude';
     var fieldOptions = '<option value="" ' + (h.field ? '' : 'selected') + '>자동 (학습된 선호 분야 사용)</option>' +
       Object.keys(FIELD_TREE).map(function(f){ return '<option value="'+f+'" '+(h.field===f?'selected':'')+'>'+f+'</option>'; }).join('');
     var hasProfile = state.trained > 0 && approved.length > 0;
@@ -814,19 +818,11 @@
 
     html += '<div class="compare-controls"><div class="mode-toggle">' +
       '<button data-homeengine="claude" class="' + (h.engine==='claude'?'active':'') + '">Claude로 찾기</button>' +
-      '<button data-homeengine="tavily" class="' + (h.engine==='tavily'?'active':'') + '">Tavily로 찾기</button>' +
+      '<button data-homeengine="tavily" class="' + (h.engine==='tavily'?'active':'') + (hasTavilyKey?'':' locked') + '" ' + (hasTavilyKey?'':'title="설정 탭에서 Tavily 키를 먼저 등록하세요"') + '>Tavily로 찾기' + (hasTavilyKey?'':' 🔒') + '</button>' +
     '</div></div>';
 
-    var tavilyBlocked = h.engine === 'tavily' && !(state.tavilySettings && state.tavilySettings.apiKey);
-    if (tavilyBlocked){
-      html += '<div class="empty" style="height:auto;padding:24px 20px;">' +
-        '<h3>Tavily API 키가 설정되어 있지 않아요</h3>' +
-        '<p>설정 탭에서 한 번만 등록해두면 여기서 매번 다시 입력하지 않아도 돼요.</p>' +
-        '<button class="btn" data-goto="settings">설정으로 이동</button></div>';
-    } else {
-      html += '<div class="field" style="max-width:200px;"><label>수집 개수 (최대 10)</label><input type="text" id="home-count" value="' + h.count + '" /></div>';
-      html += '<button class="btn" id="home-collect" ' + (h.loading?'disabled':'') + '>' + (h.loading ? '찾는 중...' : '내 성향에 맞는 자료 찾기') + '</button>';
-    }
+    html += '<div class="field" style="max-width:200px;"><label>수집 개수 (최대 10)</label><input type="text" id="home-count" value="' + h.count + '" /></div>';
+    html += '<button class="btn" id="home-collect" ' + (h.loading?'disabled':'') + '>' + (h.loading ? '찾는 중...' : '내 성향에 맞는 자료 찾기') + '</button>';
     if (h.statusMsg) html += '<p style="margin-top:10px;font-size:12px;color:var(--cream-soft);">' + escapeHtml(h.statusMsg) + '</p>';
 
     if (h.lastAdded.length){
@@ -890,6 +886,8 @@
   // ---- Bulk add tab ----
   function bulkTabHtml(){
     var b = state.bulk;
+    var hasTavilyKey = !!(state.tavilySettings && state.tavilySettings.apiKey);
+    if (b.mode === 'tavily' && !hasTavilyKey) b.mode = 'urls';
     var fieldOptions = Object.keys(FIELD_TREE).map(function(f){ return '<option value="'+f+'">'+f+'</option>'; }).join('');
     var html = '<p class="section-title">자료 대량 추가</p>' +
       '<p class="bulk-note">이 앱은 브라우저에서만 동작하기 때문에 웹사이트를 자동으로 크롤링해서 내용을 가져올 수는 없어요. 대신 URL 목록을 한 번에 붙여넣어 여러 자료를 빠르게 등록하거나, 테스트용 샘플 자료를 자동 생성할 수 있습니다. 이렇게 등록된 자료는 카드 평가에서 똑같이 스와이프하며 평가할 수 있어요.</p>' +
@@ -897,7 +895,7 @@
         '<button data-bulkmode="urls" class="' + (b.mode==='urls'?'active':'') + '">URL 목록으로 추가</button>' +
         '<button data-bulkmode="generate" class="' + (b.mode==='generate'?'active':'') + '">샘플 자동 생성</button>' +
         '<button data-bulkmode="keyword" class="' + (b.mode==='keyword'?'active':'') + '">키워드 자동 수집 (Claude)</button>' +
-        '<button data-bulkmode="tavily" class="' + (b.mode==='tavily'?'active':'') + '">키워드 자동 수집 (Tavily)</button>' +
+        '<button data-bulkmode="tavily" class="' + (b.mode==='tavily'?'active':'') + (hasTavilyKey?'':' locked') + '" ' + (hasTavilyKey?'':'title="설정 탭에서 Tavily 키를 먼저 등록하세요"') + '>키워드 자동 수집 (Tavily)' + (hasTavilyKey?'':' 🔒') + '</button>' +
       '</div></div>';
 
     if (b.mode === 'urls'){
@@ -1393,7 +1391,16 @@
 
     // home tab
     document.querySelectorAll('[data-homeengine]').forEach(function(btn){
-      btn.addEventListener('click', function(){ state.home.engine = btn.getAttribute('data-homeengine'); render(); });
+      btn.addEventListener('click', function(){
+        var engine = btn.getAttribute('data-homeengine');
+        if (engine === 'tavily' && !(state.tavilySettings && state.tavilySettings.apiKey)){
+          showToast('Tavily 키를 먼저 설정해주세요');
+          state.tab = 'settings';
+          render();
+          return;
+        }
+        state.home.engine = engine; render();
+      });
     });
     var homeFieldEl = document.getElementById('home-field');
     if (homeFieldEl) homeFieldEl.addEventListener('change', function(){ state.home.field = homeFieldEl.value; });
@@ -1462,7 +1469,16 @@
 
     // bulk add tab
     document.querySelectorAll('[data-bulkmode]').forEach(function(btn){
-      btn.addEventListener('click', function(){ state.bulk.mode = btn.getAttribute('data-bulkmode'); render(); });
+      btn.addEventListener('click', function(){
+        var mode = btn.getAttribute('data-bulkmode');
+        if (mode === 'tavily' && !(state.tavilySettings && state.tavilySettings.apiKey)){
+          showToast('Tavily 키를 먼저 설정해주세요');
+          state.tab = 'settings';
+          render();
+          return;
+        }
+        state.bulk.mode = mode; render();
+      });
     });
     var bulkAddBtn = document.getElementById('bulk-add-urls');
     if (bulkAddBtn) bulkAddBtn.addEventListener('click', function(){
