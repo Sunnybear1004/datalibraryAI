@@ -822,6 +822,9 @@
     '</div></div>';
 
     html += '<div class="field" style="max-width:200px;"><label>수집 개수 (최대 10)</label><input type="text" id="home-count" value="' + h.count + '" /></div>';
+    if (h.engine === 'tavily'){
+      html += '<div class="toggle-row"><input type="checkbox" id="home-ai-score" checked /><label for="home-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기 (Claude API 필요)</label></div>';
+    }
     html += '<button class="btn" id="home-collect" ' + (h.loading?'disabled':'') + '>' + (h.loading ? '찾는 중...' : '내 성향에 맞는 자료 찾기') + '</button>';
     if (h.statusMsg) html += '<p style="margin-top:10px;font-size:12px;color:var(--cream-soft);">' + escapeHtml(h.statusMsg) + '</p>';
 
@@ -905,7 +908,9 @@
         String.fromCharCode(10) + '예) AI 규제 최신 동향 | 조선일보 | https://example.com/a' +
         String.fromCharCode(10) + 'URL만 입력해도 됩니다: https://example.com/b' +
         String.fromCharCode(10) + '제목만 입력해도 됩니다 (출처·URL 없이 등록)"></textarea></div>' +
-        '<button class="btn" id="bulk-add-urls">목록 추가하기</button>';
+        '<div class="toggle-row"><input type="checkbox" id="bulk-ai-score" checked /><label for="bulk-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기 (Claude API 필요)</label></div>' +
+        '<button class="btn" id="bulk-add-urls">목록 추가하기</button>' +
+        '<div id="bulk-urls-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
     } else if (b.mode === 'generate') {
       html += '<div class="field-row">' +
           '<div class="field"><label>분야</label><select id="bulk-gen-field"><option value="random">무작위</option>' + fieldOptions + '</select></div>' +
@@ -931,6 +936,7 @@
         html += '<div class="field"><label>적용할 분야</label><select id="tavily-field">' + fieldOptions + '</select></div>' +
           '<div class="field"><label>검색 키워드</label><input type="text" id="tavily-kw" placeholder="예: 양자컴퓨팅 상용화" /></div>' +
           '<div class="field"><label>수집 개수 (최대 10)</label><input type="text" id="tavily-count" value="5" /></div>' +
+          '<div class="toggle-row"><input type="checkbox" id="tavily-ai-score" checked /><label for="tavily-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기 (Claude API 필요)</label></div>' +
           '<button class="btn" id="tavily-collect">Tavily로 검색하기</button>' +
           '<div id="tavily-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
       }
@@ -1109,6 +1115,52 @@
     if (brief.criteria.length) parts.push(brief.criteria[0].label);
     if (!parts.length) parts.push('최신 이슈');
     return parts.join(' ');
+  }
+
+  // Batch-scores materials that came in without AI-estimated scores (URL list, Tavily).
+  // Uses any snippet text already on hand; falls back to web search per item when needed.
+  async function estimateScoresBatch(items){
+    var listText = items.map(function(it, i){
+      return '[' + (i+1) + '] 제목: ' + it.title +
+        '\n출처: ' + (it.source || '미상') +
+        '\nURL: ' + (it.url || '없음') +
+        (it.content ? '\n요약: ' + it.content.slice(0, 400) : '');
+    }).join('\n\n');
+
+    var prompt = '다음은 자료 서고에 새로 등록하려는 자료 목록이야. 각 자료에 대해 아래 8개 평가 요소를 0~100점으로 추정해줘: ' +
+      '신뢰성(trust), 적절성(appropriateness), 최신성(recency), 객관성(objectivity), 전문성(expertise), 이해하기 쉬움(clarity), 편향성 낮음(lowBias), 관심도(interest).\n' +
+      '이미 요약이 있는 항목은 그 내용을 근거로 판단하고, 요약이 없는 항목은 필요하면 웹 검색으로 확인해서 판단해줘.\n\n' +
+      listText + '\n\n' +
+      '아래 JSON 배열로만 응답해. 설명, 마크다운, 코드펜스 없이 순수 JSON만 출력해.\n' +
+      '[{"index":1,"scores":{"trust":0-100,"appropriateness":0-100,"recency":0-100,"objectivity":0-100,"expertise":0-100,"clarity":0-100,"lowBias":0-100,"interest":0-100}}]';
+
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2200,
+        messages: [{ role: 'user', content: prompt }],
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }]
+      })
+    });
+    var data = await response.json();
+    var text = (data.content || []).map(function(bl){ return bl.type === 'text' ? bl.text : ''; }).join('\n');
+    var clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    var arr = JSON.parse(clean);
+    if (!Array.isArray(arr)) throw new Error('invalid response shape');
+    var byIndex = {};
+    arr.forEach(function(r){ if (r && r.index) byIndex[r.index] = r.scores; });
+    return items.map(function(it, i){
+      var s = byIndex[i+1];
+      if (!s) return null;
+      var scores = {};
+      CRITERIA.forEach(function(c){
+        var v = typeof s[c.key] === 'number' ? s[c.key] : 60;
+        scores[c.key] = Math.max(0, Math.min(100, Math.round(v)));
+      });
+      return scores;
+    });
   }
 
   function rejectedTabHtml(rejected){
@@ -1452,6 +1504,7 @@
         }).catch(function(err){ finishError(err); });
       } else {
         var apiKey = state.tavilySettings && state.tavilySettings.apiKey;
+        var aiScore = document.getElementById('home-ai-score') ? document.getElementById('home-ai-score').checked : false;
         if (!apiKey){ state.home.loading = false; state.home.statusMsg = '설정 탭에서 Tavily API 키를 먼저 등록해주세요'; render(); return; }
         var query = buildTavilyQuery(brief, keyword);
         tavilySearch(apiKey, query, count).then(function(items){
@@ -1460,9 +1513,23 @@
             CRITERIA.forEach(function(c){ scores[c.key] = 60; });
             var host = null;
             try { host = new URL(it.url).hostname.replace(/^www\./,''); } catch(e){ host = null; }
-            return { id: uid(), title: it.title || query, field: brief.field || Object.keys(FIELD_TREE)[0], subfield: null, source: host || '미상', url: it.url || null, matchReason: null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
+            return { id: uid(), title: it.title || query, field: brief.field || Object.keys(FIELD_TREE)[0], subfield: null, source: host || '미상', url: it.url || null, content: it.content || null, matchReason: null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
           });
-          finishSuccess(created);
+          if (!aiScore){
+            created.forEach(function(m){ delete m.content; });
+            finishSuccess(created);
+            return;
+          }
+          state.home.statusMsg = 'AI가 ' + created.length + '개 자료의 점수를 판단하고 있어요...';
+          render();
+          estimateScoresBatch(created).then(function(scoresList){
+            created.forEach(function(m, i){ if (scoresList[i]) m.scores = scoresList[i]; delete m.content; });
+            finishSuccess(created);
+          }).catch(function(err){
+            created.forEach(function(m){ delete m.content; });
+            state.home.statusMsg = 'AI 채점에 실패해서 기본 점수로 등록했어요';
+            finishSuccess(created);
+          });
         }).catch(function(err){ finishError(err, '네트워크 또는 키를 확인해주세요'); });
       }
     });
@@ -1484,12 +1551,31 @@
     if (bulkAddBtn) bulkAddBtn.addEventListener('click', function(){
       var field = document.getElementById('bulk-field').value;
       var text = document.getElementById('bulk-text').value;
+      var aiScore = document.getElementById('bulk-ai-score') ? document.getElementById('bulk-ai-score').checked : false;
       var created = parseBulkUrls(text, field);
       if (created.length === 0){ showToast('추가할 내용을 입력해주세요'); return; }
-      state.materials = state.materials.concat(created);
-      saveMaterials();
-      showToast(created.length + '개 자료가 추가되었어요');
-      render();
+      var statusEl = document.getElementById('bulk-urls-status');
+
+      function finalize(list){
+        state.materials = state.materials.concat(list);
+        saveMaterials();
+        showToast(list.length + '개 자료가 추가되었어요');
+        render();
+      }
+
+      if (!aiScore){
+        finalize(created);
+        return;
+      }
+      bulkAddBtn.disabled = true; bulkAddBtn.textContent = 'AI가 점수를 매기는 중...';
+      if (statusEl) statusEl.textContent = created.length + '개 자료의 점수를 AI가 판단하고 있어요...';
+      estimateScoresBatch(created).then(function(scoresList){
+        created.forEach(function(m, i){ if (scoresList[i]) m.scores = scoresList[i]; });
+        finalize(created);
+      }).catch(function(err){
+        showToast('AI 채점에 실패해서 기본 점수로 등록했어요: ' + (err && err.message ? err.message : '오류'));
+        finalize(created);
+      });
     });
     var bulkGenBtn = document.getElementById('bulk-generate');
     if (bulkGenBtn) bulkGenBtn.addEventListener('click', function(){
@@ -1538,6 +1624,7 @@
       var field = document.getElementById('tavily-field').value;
       var countRaw = parseInt(document.getElementById('tavily-count').value, 10);
       var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(10, countRaw));
+      var aiScore = document.getElementById('tavily-ai-score') ? document.getElementById('tavily-ai-score').checked : false;
       if (!apiKey){ showToast('설정 탭에서 Tavily API 키를 먼저 등록해주세요'); return; }
       if (!keyword){ showToast('검색 키워드를 입력해주세요'); return; }
       var statusEl = document.getElementById('tavily-status');
@@ -1549,13 +1636,27 @@
           CRITERIA.forEach(function(c){ scores[c.key] = 60; });
           var host = null;
           try { host = new URL(it.url).hostname.replace(/^www\./,''); } catch(e){ host = null; }
-          return { id: uid(), title: it.title || keyword, field: field, subfield: null, source: host || '미상', url: it.url || null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
+          return { id: uid(), title: it.title || keyword, field: field, subfield: null, source: host || '미상', url: it.url || null, content: it.content || null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
         });
         if (created.length === 0){ showToast('검색 결과가 없어요'); render(); return; }
-        state.materials = state.materials.concat(created);
-        saveMaterials();
-        showToast(created.length + '개 자료를 Tavily로 가져왔어요');
-        render();
+
+        function finalize(list){
+          list.forEach(function(m){ delete m.content; });
+          state.materials = state.materials.concat(list);
+          saveMaterials();
+          showToast(list.length + '개 자료를 Tavily로 가져왔어요');
+          render();
+        }
+
+        if (!aiScore){ finalize(created); return; }
+        if (statusEl) statusEl.textContent = 'AI가 ' + created.length + '개 자료의 점수를 판단하고 있어요...';
+        estimateScoresBatch(created).then(function(scoresList){
+          created.forEach(function(m, i){ if (scoresList[i]) m.scores = scoresList[i]; });
+          finalize(created);
+        }).catch(function(err){
+          showToast('AI 채점에 실패해서 기본 점수로 등록했어요');
+          finalize(created);
+        });
       }).catch(function(err){
         showToast('Tavily 검색에 실패했어요: ' + (err && err.message ? err.message : '네트워크 또는 키를 확인해주세요'));
         render();
