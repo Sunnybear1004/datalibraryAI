@@ -471,6 +471,7 @@
     bulk: { mode: 'urls' },
     home: { engine: 'claude', field: '', keyword: '', count: 5, loading: false, statusMsg: null, lastAdded: [] },
     tavilySettings: { apiKey: '' },
+    tavilyMsg: null,
     rejFilter: 'all',
     acctEmailMsg: null, acctEmailLoading: false,
     acctPwMsg: null, acctPwLoading: false,
@@ -816,13 +817,16 @@
       '<button data-homeengine="tavily" class="' + (h.engine==='tavily'?'active':'') + '">Tavily로 찾기</button>' +
     '</div></div>';
 
-    if (h.engine === 'tavily'){
-      var ts = state.tavilySettings || { apiKey:'' };
-      html += '<div class="field"><label>Tavily API 키</label><input type="password" id="home-tavily-key" placeholder="tvly-..." value="' + escapeHtml(ts.apiKey||'') + '" /></div>';
+    var tavilyBlocked = h.engine === 'tavily' && !(state.tavilySettings && state.tavilySettings.apiKey);
+    if (tavilyBlocked){
+      html += '<div class="empty" style="height:auto;padding:24px 20px;">' +
+        '<h3>Tavily API 키가 설정되어 있지 않아요</h3>' +
+        '<p>설정 탭에서 한 번만 등록해두면 여기서 매번 다시 입력하지 않아도 돼요.</p>' +
+        '<button class="btn" data-goto="settings">설정으로 이동</button></div>';
+    } else {
+      html += '<div class="field" style="max-width:200px;"><label>수집 개수 (최대 10)</label><input type="text" id="home-count" value="' + h.count + '" /></div>';
+      html += '<button class="btn" id="home-collect" ' + (h.loading?'disabled':'') + '>' + (h.loading ? '찾는 중...' : '내 성향에 맞는 자료 찾기') + '</button>';
     }
-
-    html += '<div class="field" style="max-width:200px;"><label>수집 개수 (최대 10)</label><input type="text" id="home-count" value="' + h.count + '" /></div>';
-    html += '<button class="btn" id="home-collect" ' + (h.loading?'disabled':'') + '>' + (h.loading ? '찾는 중...' : '내 성향에 맞는 자료 찾기') + '</button>';
     if (h.statusMsg) html += '<p style="margin-top:10px;font-size:12px;color:var(--cream-soft);">' + escapeHtml(h.statusMsg) + '</p>';
 
     if (h.lastAdded.length){
@@ -919,13 +923,19 @@
         '<div id="kw-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
     } else {
       var ts = state.tavilySettings || { apiKey: '' };
-      html += '<p class="bulk-note" style="border-color:var(--gold-soft);">Tavily는 AI 앱을 위해 만들어진 검색 API로, 깔끔한 JSON 결과(제목·URL·요약)를 돌려줍니다. 본인의 Tavily API 키가 필요해요 (tavily.com에서 무료로 발급, 월 무료 사용량 제공). 키는 이 서고 계정 저장소에만 저장되고, 브라우저에서 직접 호출하는 방식이라 완전히 안전하다고는 보장할 수 없으니 참고해주세요. 이 앱의 네트워크 환경에 따라 요청이 막힐 수도 있어, 먼저 한 번 테스트해보시는 걸 권장해요.</p>' +
-        '<div class="field"><label>Tavily API 키</label><input type="password" id="tavily-key" placeholder="tvly-..." value="' + escapeHtml(ts.apiKey || '') + '" /></div>' +
-        '<div class="field"><label>적용할 분야</label><select id="tavily-field">' + fieldOptions + '</select></div>' +
-        '<div class="field"><label>검색 키워드</label><input type="text" id="tavily-kw" placeholder="예: 양자컴퓨팅 상용화" /></div>' +
-        '<div class="field"><label>수집 개수 (최대 10)</label><input type="text" id="tavily-count" value="5" /></div>' +
-        '<button class="btn" id="tavily-collect">Tavily로 검색하기</button>' +
-        '<div id="tavily-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
+      html += '<p class="bulk-note" style="border-color:var(--gold-soft);">Tavily는 AI 앱을 위해 만들어진 검색 API로, 깔끔한 JSON 결과(제목·URL·요약)를 돌려줍니다. 이 앱의 네트워크 환경에 따라 요청이 막힐 수도 있어, 먼저 한 번 테스트해보시는 걸 권장해요.</p>';
+      if (!ts.apiKey){
+        html += '<div class="empty" style="height:auto;padding:24px 20px;">' +
+          '<h3>Tavily API 키가 설정되어 있지 않아요</h3>' +
+          '<p>설정 탭에서 한 번만 등록해두면 여기서 매번 다시 입력하지 않아도 돼요.</p>' +
+          '<button class="btn" data-goto="settings">설정으로 이동</button></div>';
+      } else {
+        html += '<div class="field"><label>적용할 분야</label><select id="tavily-field">' + fieldOptions + '</select></div>' +
+          '<div class="field"><label>검색 키워드</label><input type="text" id="tavily-kw" placeholder="예: 양자컴퓨팅 상용화" /></div>' +
+          '<div class="field"><label>수집 개수 (최대 10)</label><input type="text" id="tavily-count" value="5" /></div>' +
+          '<button class="btn" id="tavily-collect">Tavily로 검색하기</button>' +
+          '<div id="tavily-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
+      }
     }
     return html;
   }
@@ -1237,7 +1247,19 @@
   }
 
   function settingsTabHtml(){
-    var html = '<p class="section-title">데이터 관리</p><button class="btn ghost small" id="reset-all">모든 데이터 초기화</button>';
+    var html = '<p class="section-title">API 연동</p>';
+    var ts = state.tavilySettings || { apiKey: '' };
+    var hasKey = !!ts.apiKey;
+    html += '<div class="acct-block"><div class="acct-label">Tavily 검색 키</div>' +
+      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">여기에 한 번 저장해두면, "대량 추가"와 "메인화면"의 Tavily 자동 수집에서 매번 다시 입력하지 않아도 돼요. 현재 상태: <b style="color:' + (hasKey?'var(--approve)':'var(--reject)') + ';">' + (hasKey ? '설정됨' : '미설정') + '</b></p>' +
+      '<div class="field"><label>Tavily API 키</label><input type="password" id="settings-tavily-key" placeholder="tvly-..." value="' + escapeHtml(ts.apiKey||'') + '" /></div>' +
+      (state.tavilyMsg ? '<p class="acct-msg ' + state.tavilyMsg.type + '">' + escapeHtml(state.tavilyMsg.text) + '</p>' : '') +
+      '<div style="display:flex;gap:8px;">' +
+        '<button class="btn ghost small" id="tavily-save">저장하기</button>' +
+        (hasKey ? '<button class="btn ghost small" id="tavily-clear" style="border-color:var(--reject);color:var(--reject);">키 삭제</button>' : '') +
+      '</div></div>';
+
+    html += '<p class="section-title">데이터 관리</p><button class="btn ghost small" id="reset-all">모든 데이터 초기화</button>';
 
     html += '<p class="section-title">계정 관리</p>';
     html += '<div style="font-size:12px;color:var(--cream-soft);margin-bottom:14px;">현재 로그인: <b style="color:var(--gold);">' + escapeHtml(state.user ? state.user.email : '') + '</b></div>';
@@ -1422,10 +1444,8 @@
           finishSuccess(created);
         }).catch(function(err){ finishError(err); });
       } else {
-        var apiKey = document.getElementById('home-tavily-key') ? document.getElementById('home-tavily-key').value.trim() : (state.tavilySettings.apiKey || '');
-        if (!apiKey){ state.home.loading = false; state.home.statusMsg = 'Tavily API 키를 입력해주세요'; render(); return; }
-        state.tavilySettings = { apiKey: apiKey };
-        saveTavilySettings();
+        var apiKey = state.tavilySettings && state.tavilySettings.apiKey;
+        if (!apiKey){ state.home.loading = false; state.home.statusMsg = '설정 탭에서 Tavily API 키를 먼저 등록해주세요'; render(); return; }
         var query = buildTavilyQuery(brief, keyword);
         tavilySearch(apiKey, query, count).then(function(items){
           var created = items.map(function(it){
@@ -1497,15 +1517,13 @@
 
     var tavilyBtn = document.getElementById('tavily-collect');
     if (tavilyBtn) tavilyBtn.addEventListener('click', function(){
-      var apiKey = document.getElementById('tavily-key').value.trim();
+      var apiKey = state.tavilySettings && state.tavilySettings.apiKey;
       var keyword = document.getElementById('tavily-kw').value.trim();
       var field = document.getElementById('tavily-field').value;
       var countRaw = parseInt(document.getElementById('tavily-count').value, 10);
       var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(10, countRaw));
-      if (!apiKey){ showToast('Tavily API 키를 입력해주세요'); return; }
+      if (!apiKey){ showToast('설정 탭에서 Tavily API 키를 먼저 등록해주세요'); return; }
       if (!keyword){ showToast('검색 키워드를 입력해주세요'); return; }
-      state.tavilySettings = { apiKey: apiKey };
-      saveTavilySettings();
       var statusEl = document.getElementById('tavily-status');
       tavilyBtn.disabled = true; tavilyBtn.textContent = '검색 중...';
       if (statusEl) statusEl.textContent = 'Tavily에서 "' + keyword + '" 관련 자료를 찾고 있어요...';
@@ -1590,6 +1608,24 @@
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
       saveMaterials(); saveModel();
       state.tab = 'swipe';
+      render();
+    });
+
+    // settings: Tavily key
+    var tavilySaveBtn = document.getElementById('tavily-save');
+    if (tavilySaveBtn) tavilySaveBtn.addEventListener('click', function(){
+      var key = document.getElementById('settings-tavily-key').value.trim();
+      if (!key){ state.tavilyMsg = { type:'err', text:'API 키를 입력해주세요' }; render(); return; }
+      state.tavilySettings = { apiKey: key };
+      saveTavilySettings();
+      state.tavilyMsg = { type:'ok', text:'저장했어요. 이제 대량 추가·메인화면에서 바로 쓸 수 있어요.' };
+      render();
+    });
+    var tavilyClearBtn = document.getElementById('tavily-clear');
+    if (tavilyClearBtn) tavilyClearBtn.addEventListener('click', function(){
+      state.tavilySettings = { apiKey: '' };
+      saveTavilySettings();
+      state.tavilyMsg = { type:'ok', text:'키를 삭제했어요.' };
       render();
     });
 
