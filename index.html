@@ -438,6 +438,7 @@
       trained: state.trained,
       tavilySettings: state.tavilySettings,
       claudeSettings: state.claudeSettings,
+      geminiSettings: state.geminiSettings,
       updatedAt: Date.now()
     };
     currentSavePromise = appDataDocRef(uidAtCallTime).set(payload)
@@ -493,6 +494,8 @@
     tavilyMsg: null,
     claudeSettings: { apiKey: '' },
     claudeMsg: null,
+    geminiSettings: { apiKey: '', model: 'gemini-2.5-flash' },
+    geminiMsg: null,
     rejFilter: 'all',
     acctEmailMsg: null, acctEmailLoading: false,
     acctPwMsg: null, acctPwLoading: false,
@@ -513,6 +516,7 @@
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
       state.tavilySettings = { apiKey: '' };
       state.claudeSettings = { apiKey: '' };
+      state.geminiSettings = { apiKey: '', model: 'gemini-2.5-flash' };
       state.loaded = true;
       render();
       persistAppData(); // background save, no need to make the user wait
@@ -529,11 +533,13 @@
       state.trained = data.trained || 0;
       state.tavilySettings = data.tavilySettings || { apiKey: '' };
       state.claudeSettings = data.claudeSettings || { apiKey: '' };
+      state.geminiSettings = data.geminiSettings || { apiKey: '', model: 'gemini-2.5-flash' };
     } catch(e){
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
       state.tavilySettings = { apiKey: '' };
       state.claudeSettings = { apiKey: '' };
+      state.geminiSettings = { apiKey: '', model: 'gemini-2.5-flash' };
       persistAppData();
     }
 
@@ -545,6 +551,7 @@
   async function saveModel(){ return persistAppData(); }
   async function saveTavilySettings(){ return persistAppData(); }
   async function saveClaudeSettings(){ return persistAppData(); }
+  async function saveGeminiSettings(){ return persistAppData(); }
 
   function sigmoid(z){ return 1/(1+Math.exp(-z)); }
 
@@ -846,7 +853,12 @@
 
     html += '<div class="field" style="max-width:200px;"><label>수집 개수 (최대 10)</label><input type="text" id="home-count" value="' + h.count + '" /></div>';
     if (h.engine === 'tavily'){
-      html += '<div class="toggle-row"><input type="checkbox" id="home-ai-score" checked /><label for="home-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기 (Claude API 필요)</label></div>';
+      var defaultAiEngine1 = (state.geminiSettings && state.geminiSettings.apiKey) ? 'gemini' : 'claude';
+      html += '<div class="toggle-row"><input type="checkbox" id="home-ai-score" checked /><label for="home-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기</label></div>' +
+        '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="home-ai-engine">' +
+          '<option value="gemini" ' + (defaultAiEngine1==='gemini'?'selected':'') + '>Gemini</option>' +
+          '<option value="claude" ' + (defaultAiEngine1==='claude'?'selected':'') + '>Claude</option>' +
+        '</select></div>';
     }
     html += '<button class="btn" id="home-collect" ' + (h.loading?'disabled':'') + '>' + (h.loading ? '찾는 중...' : '내 성향에 맞는 자료 찾기') + '</button>';
     if (h.statusMsg) html += '<p style="margin-top:10px;font-size:12px;color:var(--cream-soft);">' + escapeHtml(h.statusMsg) + '</p>';
@@ -895,6 +907,7 @@
     var sliders = CRITERIA.map(function(c){
       return '<div class="slider-row"><label>' + c.label + '</label><input type="range" min="0" max="100" value="60" data-slider="' + c.key + '"/><span class="val" data-val="' + c.key + '">60</span></div>';
     }).join('');
+    var defaultEngine = (state.geminiSettings && state.geminiSettings.apiKey) ? 'gemini' : 'claude';
     return '' +
       '<p class="section-title">새 자료 등록</p>' +
       '<div class="field"><label>제목</label><input type="text" id="f-title" placeholder="예: OO 현상에 대한 최신 연구 결과" /></div>' +
@@ -911,7 +924,13 @@
           '<option value="ai">AI가 출처·내용을 보고 자동 판단</option>' +
         '</select></div>' +
       '<div id="slider-wrap" style="display:none;" class="slider-grid">' + sliders + '</div>' +
-      '<p id="ai-score-note" style="display:none;font-size:12px;color:var(--cream-soft);margin:-8px 0 16px;">제목·출처·URL을 바탕으로 AI가 8개 요소 점수를 추정해요 (Claude API 필요, claude.ai 안에서는 키 없이도 동작).</p>' +
+      '<div id="ai-score-wrap" style="display:none;">' +
+        '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="f-score-engine">' +
+          '<option value="gemini" ' + (defaultEngine==='gemini'?'selected':'') + '>Gemini</option>' +
+          '<option value="claude" ' + (defaultEngine==='claude'?'selected':'') + '>Claude</option>' +
+        '</select></div>' +
+        '<p id="ai-score-note" style="font-size:12px;color:var(--cream-soft);margin:-8px 0 16px;">제목·출처·URL을 바탕으로 AI가 8개 요소 점수를 추정해요. Gemini는 설정 탭에 키 등록이 꼭 필요하고, Claude는 claude.ai 안에서는 키 없이도 동작해요.</p>' +
+      '</div>' +
       '<button class="btn" id="btn-add-material">자료 추가하기</button>' +
       '<div id="add-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
   }
@@ -931,6 +950,7 @@
         '<button data-bulkmode="tavily" class="' + (b.mode==='tavily'?'active':'') + (hasTavilyKey?'':' locked') + '" ' + (hasTavilyKey?'':'title="설정 탭에서 Tavily 키를 먼저 등록하세요"') + '>키워드 자동 수집 (Tavily)' + (hasTavilyKey?'':' 🔒') + '</button>' +
       '</div></div>';
 
+    var defaultAiEngine = (state.geminiSettings && state.geminiSettings.apiKey) ? 'gemini' : 'claude';
     if (b.mode === 'urls'){
       html += '<div class="field"><label>적용할 분야 (전체 목록 동일 적용)</label><select id="bulk-field">' + fieldOptions + '</select></div>' +
         '<div class="field"><label>자료 목록 — 한 줄에 하나씩</label>' +
@@ -938,7 +958,11 @@
         String.fromCharCode(10) + '예) AI 규제 최신 동향 | 조선일보 | https://example.com/a' +
         String.fromCharCode(10) + 'URL만 입력해도 됩니다: https://example.com/b' +
         String.fromCharCode(10) + '제목만 입력해도 됩니다 (출처·URL 없이 등록)"></textarea></div>' +
-        '<div class="toggle-row"><input type="checkbox" id="bulk-ai-score" checked /><label for="bulk-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기 (Claude API 필요)</label></div>' +
+        '<div class="toggle-row"><input type="checkbox" id="bulk-ai-score" checked /><label for="bulk-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기</label></div>' +
+        '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="bulk-ai-engine">' +
+          '<option value="gemini" ' + (defaultAiEngine==='gemini'?'selected':'') + '>Gemini</option>' +
+          '<option value="claude" ' + (defaultAiEngine==='claude'?'selected':'') + '>Claude</option>' +
+        '</select></div>' +
         '<button class="btn" id="bulk-add-urls">목록 추가하기</button>' +
         '<div id="bulk-urls-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
     } else if (b.mode === 'generate') {
@@ -966,7 +990,11 @@
         html += '<div class="field"><label>적용할 분야</label><select id="tavily-field">' + fieldOptions + '</select></div>' +
           '<div class="field"><label>검색 키워드</label><input type="text" id="tavily-kw" placeholder="예: 양자컴퓨팅 상용화" /></div>' +
           '<div class="field"><label>수집 개수 (최대 10)</label><input type="text" id="tavily-count" value="5" /></div>' +
-          '<div class="toggle-row"><input type="checkbox" id="tavily-ai-score" checked /><label for="tavily-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기 (Claude API 필요)</label></div>' +
+          '<div class="toggle-row"><input type="checkbox" id="tavily-ai-score" checked /><label for="tavily-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기</label></div>' +
+          '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="tavily-ai-engine">' +
+            '<option value="gemini" ' + (defaultAiEngine==='gemini'?'selected':'') + '>Gemini</option>' +
+            '<option value="claude" ' + (defaultAiEngine==='claude'?'selected':'') + '>Claude</option>' +
+          '</select></div>' +
           '<button class="btn" id="tavily-collect">Tavily로 검색하기</button>' +
           '<div id="tavily-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
       }
@@ -1149,7 +1177,7 @@
 
   // Batch-scores materials that came in without AI-estimated scores (URL list, Tavily).
   // Uses any snippet text already on hand; falls back to web search per item when needed.
-  async function estimateScoresBatch(items){
+  async function estimateScoresBatchClaude(items){
     var listText = items.map(function(it, i){
       return '[' + (i+1) + '] 제목: ' + it.title +
         '\n출처: ' + (it.source || '미상') +
@@ -1175,6 +1203,7 @@
       })
     });
     var data = await response.json();
+    if (data.error) throw new Error(data.error.message || 'Claude API 오류');
     var text = (data.content || []).map(function(bl){ return bl.type === 'text' ? bl.text : ''; }).join('\n');
     var clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     var arr = JSON.parse(clean);
@@ -1191,6 +1220,69 @@
       });
       return scores;
     });
+  }
+
+  // Gemini Developer API — generateContent with responseMimeType:'application/json'
+  // for reliable structured output. Judges from title/source/any snippet on hand
+  // (no live web search — that needs a separate grounding tool most free keys don't have).
+  async function estimateScoresBatchGemini(items){
+    var gs = state.geminiSettings || {};
+    var apiKey = gs.apiKey;
+    var model = gs.model || 'gemini-2.5-flash';
+    if (!apiKey) throw new Error('설정 탭에서 Gemini API 키를 먼저 등록해주세요');
+
+    var listText = items.map(function(it, i){
+      return '[' + (i+1) + '] 제목: ' + it.title +
+        '\n출처: ' + (it.source || '미상') +
+        '\nURL: ' + (it.url || '없음') +
+        (it.content ? '\n요약: ' + it.content.slice(0, 400) : '');
+    }).join('\n\n');
+
+    var prompt = '다음은 자료 서고에 새로 등록하려는 자료 목록이야. 각 자료에 대해 아래 8개 평가 요소를 0~100점으로 추정해줘: ' +
+      '신뢰성(trust), 적절성(appropriateness), 최신성(recency), 객관성(objectivity), 전문성(expertise), 이해하기 쉬움(clarity), 편향성 낮음(lowBias), 관심도(interest).\n' +
+      '이미 요약이 있는 항목은 그 내용을 근거로 판단하고, 요약이 없는 항목은 제목과 출처만 보고 네가 알고 있는 지식을 바탕으로 합리적으로 추정해줘.\n\n' +
+      listText + '\n\n' +
+      '아래 JSON 배열로만 응답해:\n' +
+      '[{"index":1,"scores":{"trust":0-100,"appropriateness":0-100,"recency":0-100,"objectivity":0-100,"expertise":0-100,"clarity":0-100,"lowBias":0-100,"interest":0-100}}]';
+
+    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json' }
+      })
+    });
+    var data = await response.json();
+    if (data.error) throw new Error(data.error.message || 'Gemini API 오류');
+    var text;
+    try {
+      text = data.candidates[0].content.parts.map(function(p){ return p.text || ''; }).join('\n');
+    } catch(e){
+      throw new Error('예상치 못한 Gemini 응답 형식이에요');
+    }
+    var clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    var arr = JSON.parse(clean);
+    if (!Array.isArray(arr)) throw new Error('invalid response shape');
+    var byIndex = {};
+    arr.forEach(function(r){ if (r && r.index) byIndex[r.index] = r.scores; });
+    return items.map(function(it, i){
+      var s = byIndex[i+1];
+      if (!s) return null;
+      var scores = {};
+      CRITERIA.forEach(function(c){
+        var v = typeof s[c.key] === 'number' ? s[c.key] : 60;
+        scores[c.key] = Math.max(0, Math.min(100, Math.round(v)));
+      });
+      return scores;
+    });
+  }
+
+  function estimateScoresBatch(items, engine){
+    return engine === 'gemini' ? estimateScoresBatchGemini(items) : estimateScoresBatchClaude(items);
   }
 
   function rejectedTabHtml(rejected){
@@ -1350,6 +1442,19 @@
         (hasClaudeKey ? '<button class="btn ghost small" id="claude-clear" style="border-color:var(--reject);color:var(--reject);">키 삭제</button>' : '') +
       '</div></div>';
 
+    var gs = state.geminiSettings || { apiKey: '', model: 'gemini-2.5-flash' };
+    var hasGeminiKey = !!gs.apiKey;
+    html += '<div class="acct-block"><div class="acct-label">Gemini API 키</div>' +
+      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">"AI 자동 채점"에서 Gemini를 채점 엔진으로 쓰려면 여기에 키가 필요해요 (Google AI Studio, aistudio.google.com 에서 무료 발급). Claude와 달리 어디서든(claude.ai 안이든 배포된 사이트든) 이 키가 있어야 동작합니다. 현재 상태: <b style="color:' + (hasGeminiKey?'var(--approve)':'var(--reject)') + ';">' + (hasGeminiKey ? '설정됨' : '미설정') + '</b></p>' +
+      '<div class="field"><label>Gemini API 키</label><input type="password" id="settings-gemini-key" placeholder="AIza..." value="' + escapeHtml(gs.apiKey||'') + '" /></div>' +
+      '<div class="field"><label>모델명</label><input type="text" id="settings-gemini-model" placeholder="gemini-2.5-flash" value="' + escapeHtml(gs.model||'gemini-2.5-flash') + '" /></div>' +
+      '<p style="font-size:11px;color:var(--cream-soft);margin:-8px 0 12px;">모델 이름이 바뀌었거나 오류가 나면 이 값을 최신 모델명으로 바꿔보세요.</p>' +
+      (state.geminiMsg ? '<p class="acct-msg ' + state.geminiMsg.type + '">' + escapeHtml(state.geminiMsg.text) + '</p>' : '') +
+      '<div style="display:flex;gap:8px;">' +
+        '<button class="btn ghost small" id="gemini-save">저장하기</button>' +
+        (hasGeminiKey ? '<button class="btn ghost small" id="gemini-clear" style="border-color:var(--reject);color:var(--reject);">키 삭제</button>' : '') +
+      '</div></div>';
+
     html += '<p class="section-title">데이터 관리</p><button class="btn ghost small" id="reset-all">모든 데이터 초기화</button>';
 
     html += '<p class="section-title">계정 관리</p>';
@@ -1454,10 +1559,10 @@
     if (fField){ refreshSubfields(); fField.addEventListener('change', refreshSubfields); }
     var fDetail = document.getElementById('f-score-mode');
     var sliderWrap = document.getElementById('slider-wrap');
-    var aiScoreNote = document.getElementById('ai-score-note');
+    var aiScoreWrap = document.getElementById('ai-score-wrap');
     if (fDetail) fDetail.addEventListener('change', function(){
       sliderWrap.style.display = (fDetail.value === 'manual') ? 'grid' : 'none';
-      aiScoreNote.style.display = (fDetail.value === 'ai') ? 'block' : 'none';
+      aiScoreWrap.style.display = (fDetail.value === 'ai') ? 'block' : 'none';
     });
     document.querySelectorAll('[data-slider]').forEach(function(inp){
       inp.addEventListener('input', function(){
@@ -1487,9 +1592,10 @@
       }
 
       if (mode === 'ai'){
+        var addEngine = document.getElementById('f-score-engine') ? document.getElementById('f-score-engine').value : 'claude';
         addBtn.disabled = true; addBtn.textContent = 'AI가 점수를 매기는 중...';
         if (addStatusEl) addStatusEl.textContent = 'AI가 출처·내용을 바탕으로 점수를 판단하고 있어요...';
-        estimateScoresBatch([{ title: title, source: source, url: urlVal }]).then(function(scoresList){
+        estimateScoresBatch([{ title: title, source: source, url: urlVal }], addEngine).then(function(scoresList){
           var scores = scoresList[0] || (function(){ var s={}; CRITERIA.forEach(function(c){ s[c.key]=60; }); return s; })();
           finalizeAdd(scores);
         }).catch(function(err){
@@ -1572,6 +1678,7 @@
       } else {
         var apiKey = state.tavilySettings && state.tavilySettings.apiKey;
         var aiScore = document.getElementById('home-ai-score') ? document.getElementById('home-ai-score').checked : false;
+        var aiEngine = document.getElementById('home-ai-engine') ? document.getElementById('home-ai-engine').value : 'claude';
         if (!apiKey){ state.home.loading = false; state.home.statusMsg = '설정 탭에서 Tavily API 키를 먼저 등록해주세요'; render(); return; }
         var query = buildTavilyQuery(brief, keyword);
         tavilySearch(apiKey, query, count).then(function(items){
@@ -1589,7 +1696,7 @@
           }
           state.home.statusMsg = 'AI가 ' + created.length + '개 자료의 점수를 판단하고 있어요...';
           render();
-          estimateScoresBatch(created).then(function(scoresList){
+          estimateScoresBatch(created, aiEngine).then(function(scoresList){
             created.forEach(function(m, i){ if (scoresList[i]) m.scores = scoresList[i]; delete m.content; });
             finishSuccess(created);
           }).catch(function(err){
@@ -1619,6 +1726,7 @@
       var field = document.getElementById('bulk-field').value;
       var text = document.getElementById('bulk-text').value;
       var aiScore = document.getElementById('bulk-ai-score') ? document.getElementById('bulk-ai-score').checked : false;
+      var aiEngine = document.getElementById('bulk-ai-engine') ? document.getElementById('bulk-ai-engine').value : 'claude';
       var created = parseBulkUrls(text, field);
       if (created.length === 0){ showToast('추가할 내용을 입력해주세요'); return; }
       var statusEl = document.getElementById('bulk-urls-status');
@@ -1636,7 +1744,7 @@
       }
       bulkAddBtn.disabled = true; bulkAddBtn.textContent = 'AI가 점수를 매기는 중...';
       if (statusEl) statusEl.textContent = created.length + '개 자료의 점수를 AI가 판단하고 있어요...';
-      estimateScoresBatch(created).then(function(scoresList){
+      estimateScoresBatch(created, aiEngine).then(function(scoresList){
         created.forEach(function(m, i){ if (scoresList[i]) m.scores = scoresList[i]; });
         finalize(created);
       }).catch(function(err){
@@ -1692,6 +1800,7 @@
       var countRaw = parseInt(document.getElementById('tavily-count').value, 10);
       var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(10, countRaw));
       var aiScore = document.getElementById('tavily-ai-score') ? document.getElementById('tavily-ai-score').checked : false;
+      var aiEngine = document.getElementById('tavily-ai-engine') ? document.getElementById('tavily-ai-engine').value : 'claude';
       if (!apiKey){ showToast('설정 탭에서 Tavily API 키를 먼저 등록해주세요'); return; }
       if (!keyword){ showToast('검색 키워드를 입력해주세요'); return; }
       var statusEl = document.getElementById('tavily-status');
@@ -1717,7 +1826,7 @@
 
         if (!aiScore){ finalize(created); return; }
         if (statusEl) statusEl.textContent = 'AI가 ' + created.length + '개 자료의 점수를 판단하고 있어요...';
-        estimateScoresBatch(created).then(function(scoresList){
+        estimateScoresBatch(created, aiEngine).then(function(scoresList){
           created.forEach(function(m, i){ if (scoresList[i]) m.scores = scoresList[i]; });
           finalize(created);
         }).catch(function(err){
@@ -1828,6 +1937,25 @@
       state.claudeSettings = { apiKey: '' };
       saveClaudeSettings();
       state.claudeMsg = { type:'ok', text:'키를 삭제했어요. claude.ai 안에서는 계속 키 없이 동작해요.' };
+      render();
+    });
+
+    // settings: Gemini key
+    var geminiSaveBtn = document.getElementById('gemini-save');
+    if (geminiSaveBtn) geminiSaveBtn.addEventListener('click', function(){
+      var key = document.getElementById('settings-gemini-key').value.trim();
+      var model = document.getElementById('settings-gemini-model').value.trim() || 'gemini-2.5-flash';
+      if (!key){ state.geminiMsg = { type:'err', text:'API 키를 입력해주세요' }; render(); return; }
+      state.geminiSettings = { apiKey: key, model: model };
+      saveGeminiSettings();
+      state.geminiMsg = { type:'ok', text:'저장했어요. 이제 AI 자동 채점에서 Gemini를 선택할 수 있어요.' };
+      render();
+    });
+    var geminiClearBtn = document.getElementById('gemini-clear');
+    if (geminiClearBtn) geminiClearBtn.addEventListener('click', function(){
+      state.geminiSettings = { apiKey: '', model: state.geminiSettings.model || 'gemini-2.5-flash' };
+      saveGeminiSettings();
+      state.geminiMsg = { type:'ok', text:'키를 삭제했어요.' };
       render();
     });
 
