@@ -341,6 +341,22 @@
 
   function uid(){ return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
+  // Inside claude.ai artifacts, api.anthropic.com works with no key at all.
+  // Outside (e.g. GitHub Pages), a personal key + this header is required for
+  // Anthropic to accept a request made directly from a browser.
+  function claudeApiHeaders(){
+    var key = state.claudeSettings && state.claudeSettings.apiKey;
+    if (key){
+      return {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      };
+    }
+    return { 'Content-Type': 'application/json' };
+  }
+
   // ---------- Firebase (auth + per-user Firestore storage) ----------
   var firebaseConfig = {
     apiKey: "AIzaSyBNfW3wwTqpuWn4_oXGoll3BKlgwnn6G0I",
@@ -421,6 +437,7 @@
       bias: state.bias,
       trained: state.trained,
       tavilySettings: state.tavilySettings,
+      claudeSettings: state.claudeSettings,
       updatedAt: Date.now()
     };
     currentSavePromise = appDataDocRef(uidAtCallTime).set(payload)
@@ -474,6 +491,8 @@
     home: { engine: 'claude', field: '', keyword: '', count: 5, loading: false, statusMsg: null, lastAdded: [] },
     tavilySettings: { apiKey: '' },
     tavilyMsg: null,
+    claudeSettings: { apiKey: '' },
+    claudeMsg: null,
     rejFilter: 'all',
     acctEmailMsg: null, acctEmailLoading: false,
     acctPwMsg: null, acctPwLoading: false,
@@ -493,6 +512,7 @@
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
       state.tavilySettings = { apiKey: '' };
+      state.claudeSettings = { apiKey: '' };
       state.loaded = true;
       render();
       persistAppData(); // background save, no need to make the user wait
@@ -508,10 +528,12 @@
       state.bias = typeof data.bias === 'number' ? data.bias : 0;
       state.trained = data.trained || 0;
       state.tavilySettings = data.tavilySettings || { apiKey: '' };
+      state.claudeSettings = data.claudeSettings || { apiKey: '' };
     } catch(e){
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
       state.tavilySettings = { apiKey: '' };
+      state.claudeSettings = { apiKey: '' };
       persistAppData();
     }
 
@@ -522,6 +544,7 @@
   async function saveMaterials(){ return persistAppData(); }
   async function saveModel(){ return persistAppData(); }
   async function saveTavilySettings(){ return persistAppData(); }
+  async function saveClaudeSettings(){ return persistAppData(); }
 
   function sigmoid(z){ return 1/(1+Math.exp(-z)); }
 
@@ -997,7 +1020,7 @@
 
     var response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: claudeApiHeaders(),
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 2000,
@@ -1087,7 +1110,7 @@
 
     var response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: claudeApiHeaders(),
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 2200,
@@ -1136,7 +1159,7 @@
 
     var response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: claudeApiHeaders(),
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 2200,
@@ -1307,6 +1330,17 @@
       '<div style="display:flex;gap:8px;">' +
         '<button class="btn ghost small" id="tavily-save">저장하기</button>' +
         (hasKey ? '<button class="btn ghost small" id="tavily-clear" style="border-color:var(--reject);color:var(--reject);">키 삭제</button>' : '') +
+      '</div></div>';
+
+    var cs = state.claudeSettings || { apiKey: '' };
+    var hasClaudeKey = !!cs.apiKey;
+    html += '<div class="acct-block"><div class="acct-label">Claude API 키</div>' +
+      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">claude.ai 안에서는 키 없이도 "키워드 자동 수집 (Claude)"와 "AI 자동 채점"이 바로 동작해요. 이 키는 GitHub Pages 등 밖으로 배포한 뒤에도 그 기능들을 계속 쓰고 싶을 때만 필요합니다 (console.anthropic.com에서 발급). 현재 상태: <b style="color:' + (hasClaudeKey?'var(--approve)':'var(--reject)') + ';">' + (hasClaudeKey ? '설정됨' : '미설정 (claude.ai 안에서는 이대로도 동작해요)') + '</b></p>' +
+      '<div class="field"><label>Claude API 키</label><input type="password" id="settings-claude-key" placeholder="sk-ant-..." value="' + escapeHtml(cs.apiKey||'') + '" /></div>' +
+      (state.claudeMsg ? '<p class="acct-msg ' + state.claudeMsg.type + '">' + escapeHtml(state.claudeMsg.text) + '</p>' : '') +
+      '<div style="display:flex;gap:8px;">' +
+        '<button class="btn ghost small" id="claude-save">저장하기</button>' +
+        (hasClaudeKey ? '<button class="btn ghost small" id="claude-clear" style="border-color:var(--reject);color:var(--reject);">키 삭제</button>' : '') +
       '</div></div>';
 
     html += '<p class="section-title">데이터 관리</p><button class="btn ghost small" id="reset-all">모든 데이터 초기화</button>';
@@ -1743,6 +1777,24 @@
       state.tavilySettings = { apiKey: '' };
       saveTavilySettings();
       state.tavilyMsg = { type:'ok', text:'키를 삭제했어요.' };
+      render();
+    });
+
+    // settings: Claude key
+    var claudeSaveBtn = document.getElementById('claude-save');
+    if (claudeSaveBtn) claudeSaveBtn.addEventListener('click', function(){
+      var key = document.getElementById('settings-claude-key').value.trim();
+      if (!key){ state.claudeMsg = { type:'err', text:'API 키를 입력해주세요' }; render(); return; }
+      state.claudeSettings = { apiKey: key };
+      saveClaudeSettings();
+      state.claudeMsg = { type:'ok', text:'저장했어요. 이제 배포된 사이트에서도 Claude 기반 기능이 동작해요.' };
+      render();
+    });
+    var claudeClearBtn = document.getElementById('claude-clear');
+    if (claudeClearBtn) claudeClearBtn.addEventListener('click', function(){
+      state.claudeSettings = { apiKey: '' };
+      saveClaudeSettings();
+      state.claudeMsg = { type:'ok', text:'키를 삭제했어요. claude.ai 안에서는 계속 키 없이 동작해요.' };
       render();
     });
 
