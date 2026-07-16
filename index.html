@@ -904,9 +904,16 @@
       '</div>' +
       '<div class="field"><label>출처</label><input type="text" id="f-source" placeholder="예: OO 저널, OO 신문, 개인 블로그 등" /></div>' +
       '<div class="field"><label>원문 URL (선택)</label><input type="text" id="f-url" placeholder="https://..." /></div>' +
-      '<div class="toggle-row"><input type="checkbox" id="f-detail" /><label for="f-detail" style="margin:0;">초기 점수를 직접 입력하겠습니다 (기본값: 전부 60점)</label></div>' +
+      '<div class="field"><label>평가 점수(신뢰성·객관성·이해하기 쉬움 등 8개) 입력 방식</label>' +
+        '<select id="f-score-mode">' +
+          '<option value="default">기본값 사용 (전부 60점)</option>' +
+          '<option value="manual">직접 입력 (슬라이더)</option>' +
+          '<option value="ai">AI가 출처·내용을 보고 자동 판단</option>' +
+        '</select></div>' +
       '<div id="slider-wrap" style="display:none;" class="slider-grid">' + sliders + '</div>' +
-      '<button class="btn" id="btn-add-material">자료 추가하기</button>';
+      '<p id="ai-score-note" style="display:none;font-size:12px;color:var(--cream-soft);margin:-8px 0 16px;">제목·출처·URL을 바탕으로 AI가 8개 요소 점수를 추정해요 (Claude API 필요, claude.ai 안에서는 키 없이도 동작).</p>' +
+      '<button class="btn" id="btn-add-material">자료 추가하기</button>' +
+      '<div id="add-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
   }
 
   // ---- Bulk add tab ----
@@ -1445,9 +1452,13 @@
       fSubfield.innerHTML = '<option value="">해당 없음</option>' + subs.map(function(s){ return '<option value="'+s+'">'+s+'</option>'; }).join('');
     }
     if (fField){ refreshSubfields(); fField.addEventListener('change', refreshSubfields); }
-    var fDetail = document.getElementById('f-detail');
+    var fDetail = document.getElementById('f-score-mode');
     var sliderWrap = document.getElementById('slider-wrap');
-    if (fDetail) fDetail.addEventListener('change', function(){ sliderWrap.style.display = fDetail.checked ? 'grid' : 'none'; });
+    var aiScoreNote = document.getElementById('ai-score-note');
+    if (fDetail) fDetail.addEventListener('change', function(){
+      sliderWrap.style.display = (fDetail.value === 'manual') ? 'grid' : 'none';
+      aiScoreNote.style.display = (fDetail.value === 'ai') ? 'block' : 'none';
+    });
     document.querySelectorAll('[data-slider]').forEach(function(inp){
       inp.addEventListener('input', function(){
         document.querySelector('[data-val="' + inp.getAttribute('data-slider') + '"]').textContent = inp.value;
@@ -1461,18 +1472,40 @@
       var subfield = fSubfield.value || null;
       var source = document.getElementById('f-source').value.trim();
       var urlVal = document.getElementById('f-url').value.trim();
+      var mode = document.getElementById('f-score-mode').value;
+      var addStatusEl = document.getElementById('add-status');
+
+      function finalizeAdd(scores){
+        var newMat = { id: uid(), title:title, field:field, subfield:subfield, source: source || '미상', url: urlVal || null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
+        state.materials.push(newMat);
+        saveMaterials();
+        showToast('자료가 추가되었어요. 카드 평가에서 만나보세요.');
+        var titleEl = document.getElementById('f-title');
+        if (titleEl){
+          titleEl.value=''; document.getElementById('f-source').value=''; document.getElementById('f-url').value='';
+        }
+      }
+
+      if (mode === 'ai'){
+        addBtn.disabled = true; addBtn.textContent = 'AI가 점수를 매기는 중...';
+        if (addStatusEl) addStatusEl.textContent = 'AI가 출처·내용을 바탕으로 점수를 판단하고 있어요...';
+        estimateScoresBatch([{ title: title, source: source, url: urlVal }]).then(function(scoresList){
+          var scores = scoresList[0] || (function(){ var s={}; CRITERIA.forEach(function(c){ s[c.key]=60; }); return s; })();
+          finalizeAdd(scores);
+        }).catch(function(err){
+          showToast('AI 채점에 실패해서 기본 점수로 등록했어요');
+          var scores = {}; CRITERIA.forEach(function(c){ scores[c.key] = 60; });
+          finalizeAdd(scores);
+        });
+        return;
+      }
+
       var scores = {};
       CRITERIA.forEach(function(c){
         var slider = document.querySelector('[data-slider="' + c.key + '"]');
-        scores[c.key] = slider ? parseInt(slider.value,10) : 60;
+        scores[c.key] = (mode === 'manual' && slider) ? parseInt(slider.value,10) : 60;
       });
-      var newMat = { id: uid(), title:title, field:field, subfield:subfield, source: source || '미상', url: urlVal || null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
-      state.materials.push(newMat);
-      saveMaterials();
-      showToast('자료가 추가되었어요. 카드 평가에서 만나보세요.');
-      document.getElementById('f-title').value='';
-      document.getElementById('f-source').value='';
-      document.getElementById('f-url').value='';
+      finalizeAdd(scores);
     });
 
     // home tab
