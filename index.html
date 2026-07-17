@@ -2032,18 +2032,33 @@
       state.geminiSettings = { apiKey: key, model: model };
       saveGeminiSettings();
       state.geminiTestLoading = true;
-      state.geminiMsg = { type:'ok', text:'저장했어요. 이 모델로 연결을 확인하는 중...' };
+      state.geminiModelListLoading = true;
+      state.geminiMsg = { type:'ok', text:'저장했어요. 연결 확인과 모델 목록을 함께 불러오는 중...' };
       render();
-      testGeminiConnection(key, model).then(function(){
+
+      Promise.allSettled([
+        testGeminiConnection(key, model),
+        listGeminiModels(key)
+      ]).then(function(results){
         state.geminiTestLoading = false;
-        state.geminiMsg = { type:'ok', text:'저장 완료 — 연결 확인됨, "' + model + '" 모델이 정상 동작해요 ✓' };
-        render();
-      }).catch(function(err){
-        state.geminiTestLoading = false;
-        var hint = err.status === 404
-          ? ' 이 키에서 "' + model + '" 모델을 찾을 수 없어요 — 위의 "내 키로 실제 사용 가능한 모델 확인"으로 맞는 이름을 다시 골라주세요.'
-          : '';
-        state.geminiMsg = { type:'err', text:'설정은 저장됐지만 연결 확인에 실패했어요 (' + (err && err.message ? err.message : '오류') + ').' + hint };
+        state.geminiModelListLoading = false;
+        var testResult = results[0];
+        var listResult = results[1];
+
+        if (listResult.status === 'fulfilled'){
+          state.geminiModelList = listResult.value;
+        }
+
+        if (testResult.status === 'fulfilled'){
+          var countNote = listResult.status === 'fulfilled' ? (' (이 키로 총 ' + listResult.value.length + '개 모델 사용 가능)') : '';
+          state.geminiMsg = { type:'ok', text:'저장 완료 — 연결 확인됨, "' + model + '" 모델이 정상 동작해요 ✓' + countNote };
+        } else {
+          var err = testResult.reason;
+          var hint = err && err.status === 404
+            ? ' 아래 목록에서 실제 사용 가능한 모델을 골라 다시 저장해주세요.'
+            : '';
+          state.geminiMsg = { type:'err', text:'설정은 저장됐지만 연결 확인에 실패했어요 (' + (err && err.message ? err.message : '오류') + ').' + hint };
+        }
         render();
       });
     });
