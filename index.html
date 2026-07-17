@@ -1247,9 +1247,9 @@
   // Fires one minimal generateContent call to confirm the key+model combo
   // actually works, surfacing a 404 (wrong model) vs other errors clearly.
   async function testGeminiConnection(apiKey, model){
-    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', {
+    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: 'ping' }] }] })
     });
     var data = null;
@@ -1264,9 +1264,8 @@
   }
 
   async function listGeminiModels(apiKey){
-    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
-      method: 'GET',
-      headers: { 'x-goog-api-key': apiKey }
+    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(apiKey), {
+      method: 'GET'
     });
     var data = await response.json();
     if (data.error) throw new Error(data.error.message || 'Gemini API 오류');
@@ -1296,11 +1295,10 @@
       '아래 JSON 배열로만 응답해:\n' +
       '[{"index":1,"scores":{"trust":0-100,"appropriateness":0-100,"recency":0-100,"objectivity":0-100,"expertise":0-100,"clarity":0-100,"lowBias":0-100,"interest":0-100}}]';
 
-    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', {
+    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey), {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
