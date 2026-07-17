@@ -1286,6 +1286,16 @@
     return engine === 'gemini' ? estimateScoresBatchGemini(items) : estimateScoresBatchClaude(items);
   }
 
+  // Applies AI-returned scores onto materials and returns a short status
+  // suffix so the success toast can honestly say whether scoring actually happened.
+  function applyAiScores(created, scoresList){
+    var applied = 0;
+    created.forEach(function(m, i){ if (scoresList[i]){ m.scores = scoresList[i]; applied++; } });
+    if (applied === created.length) return ' (AI 채점 완료)';
+    if (applied > 0) return ' (' + applied + '/' + created.length + '개만 AI 채점됨, 나머지는 기본 점수)';
+    return ' (AI 응답을 적용하지 못해 기본 점수로 등록됨)';
+  }
+
   function rejectedTabHtml(rejected){
     if (rejected.length === 0){
       return '<div class="empty"><h3>반려 자료함이 비어있어요</h3><p>카드 평가에서 왼쪽으로 넘긴 자료가 이유와 함께 여기 보관됩니다.</p></div>';
@@ -1581,11 +1591,11 @@
       var mode = document.getElementById('f-score-mode').value;
       var addStatusEl = document.getElementById('add-status');
 
-      function finalizeAdd(scores){
+      function finalizeAdd(scores, suffix){
         var newMat = { id: uid(), title:title, field:field, subfield:subfield, source: source || '미상', url: urlVal || null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
         state.materials.push(newMat);
         saveMaterials();
-        showToast('자료가 추가되었어요. 카드 평가에서 만나보세요.');
+        showToast('자료가 추가되었어요.' + (suffix || '') + ' 카드 평가에서 만나보세요.');
         var titleEl = document.getElementById('f-title');
         if (titleEl){
           titleEl.value=''; document.getElementById('f-source').value=''; document.getElementById('f-url').value='';
@@ -1597,8 +1607,9 @@
         addBtn.disabled = true; addBtn.textContent = 'AI가 점수를 매기는 중...';
         if (addStatusEl) addStatusEl.textContent = 'AI가 출처·내용을 바탕으로 점수를 판단하고 있어요...';
         estimateScoresBatch([{ title: title, source: source, url: urlVal }], addEngine).then(function(scoresList){
-          var scores = scoresList[0] || (function(){ var s={}; CRITERIA.forEach(function(c){ s[c.key]=60; }); return s; })();
-          finalizeAdd(scores);
+          var got = scoresList[0];
+          var scores = got || (function(){ var s={}; CRITERIA.forEach(function(c){ s[c.key]=60; }); return s; })();
+          finalizeAdd(scores, got ? ' (AI 채점 완료)' : ' (AI 응답을 적용하지 못해 기본 점수)');
         }).catch(function(err){
           showToast('AI 채점에 실패해서 기본 점수로 등록했어요: ' + (err && err.message ? err.message : '오류'));
           var scores = {}; CRITERIA.forEach(function(c){ scores[c.key] = 60; });
@@ -1649,12 +1660,12 @@
       state.home.statusMsg = keyword ? ('"' + keyword + '"와(과) 당신의 프로필을 함께 반영해서 찾고 있어요...') : '당신의 프로필에 맞는 자료를 찾고 있어요...';
       render();
 
-      function finishSuccess(created){
+      function finishSuccess(created, suffix){
         state.materials = state.materials.concat(created);
         saveMaterials();
         state.home.loading = false;
         state.home.lastAdded = created;
-        state.home.statusMsg = created.length + '개 자료를 찾아서 카드 평가 목록에 추가했어요';
+        state.home.statusMsg = created.length + '개 자료를 찾아서 카드 평가 목록에 추가했어요' + (suffix || '');
         render();
       }
       function finishError(err, hint){
@@ -1698,8 +1709,9 @@
           state.home.statusMsg = 'AI가 ' + created.length + '개 자료의 점수를 판단하고 있어요...';
           render();
           estimateScoresBatch(created, aiEngine).then(function(scoresList){
-            created.forEach(function(m, i){ if (scoresList[i]) m.scores = scoresList[i]; delete m.content; });
-            finishSuccess(created);
+            var suffix = applyAiScores(created, scoresList);
+            created.forEach(function(m){ delete m.content; });
+            finishSuccess(created, suffix);
           }).catch(function(err){
             created.forEach(function(m){ delete m.content; });
             showToast('AI 채점에 실패해서 기본 점수로 등록했어요: ' + (err && err.message ? err.message : '오류'));
@@ -1732,10 +1744,10 @@
       if (created.length === 0){ showToast('추가할 내용을 입력해주세요'); return; }
       var statusEl = document.getElementById('bulk-urls-status');
 
-      function finalize(list){
+      function finalize(list, suffix){
         state.materials = state.materials.concat(list);
         saveMaterials();
-        showToast(list.length + '개 자료가 추가되었어요');
+        showToast(list.length + '개 자료가 추가되었어요' + (suffix || ''));
         render();
       }
 
@@ -1746,8 +1758,8 @@
       bulkAddBtn.disabled = true; bulkAddBtn.textContent = 'AI가 점수를 매기는 중...';
       if (statusEl) statusEl.textContent = created.length + '개 자료의 점수를 AI가 판단하고 있어요...';
       estimateScoresBatch(created, aiEngine).then(function(scoresList){
-        created.forEach(function(m, i){ if (scoresList[i]) m.scores = scoresList[i]; });
-        finalize(created);
+        var suffix = applyAiScores(created, scoresList);
+        finalize(created, suffix);
       }).catch(function(err){
         showToast('AI 채점에 실패해서 기본 점수로 등록했어요: ' + (err && err.message ? err.message : '오류'));
         finalize(created);
@@ -1817,19 +1829,19 @@
         });
         if (created.length === 0){ showToast('검색 결과가 없어요'); render(); return; }
 
-        function finalize(list){
+        function finalize(list, suffix){
           list.forEach(function(m){ delete m.content; });
           state.materials = state.materials.concat(list);
           saveMaterials();
-          showToast(list.length + '개 자료를 Tavily로 가져왔어요');
+          showToast(list.length + '개 자료를 Tavily로 가져왔어요' + (suffix || ''));
           render();
         }
 
         if (!aiScore){ finalize(created); return; }
         if (statusEl) statusEl.textContent = 'AI가 ' + created.length + '개 자료의 점수를 판단하고 있어요...';
         estimateScoresBatch(created, aiEngine).then(function(scoresList){
-          created.forEach(function(m, i){ if (scoresList[i]) m.scores = scoresList[i]; });
-          finalize(created);
+          var suffix = applyAiScores(created, scoresList);
+          finalize(created, suffix);
         }).catch(function(err){
           showToast('AI 채점에 실패해서 기본 점수로 등록했어요: ' + (err && err.message ? err.message : '오류'));
           finalize(created);
