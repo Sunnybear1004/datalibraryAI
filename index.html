@@ -496,6 +496,8 @@
     claudeMsg: null,
     geminiSettings: { apiKey: '', model: 'gemini-2.5-flash' },
     geminiMsg: null,
+    geminiModelList: null,
+    geminiModelListLoading: false,
     rejFilter: 'all',
     acctEmailMsg: null, acctEmailLoading: false,
     acctPwMsg: null, acctPwLoading: false,
@@ -1226,6 +1228,21 @@
   // Gemini Developer API — generateContent with responseMimeType:'application/json'
   // for reliable structured output. Judges from title/source/any snippet on hand
   // (no live web search — that needs a separate grounding tool most free keys don't have).
+  // Model names/availability vary by key, so instead of guessing, let the
+  // person pull the real list for their own key and pick one that works.
+  async function listGeminiModels(apiKey){
+    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+      method: 'GET',
+      headers: { 'x-goog-api-key': apiKey }
+    });
+    var data = await response.json();
+    if (data.error) throw new Error(data.error.message || 'Gemini API 오류');
+    if (!data.models) throw new Error('모델 목록을 받지 못했어요');
+    return data.models
+      .filter(function(m){ return (m.supportedGenerationMethods || []).indexOf('generateContent') !== -1; })
+      .map(function(m){ return { name: (m.name || '').replace(/^models\//, ''), displayName: m.displayName || m.name }; });
+  }
+
   async function estimateScoresBatchGemini(items){
     var gs = state.geminiSettings || {};
     var apiKey = gs.apiKey;
@@ -1459,8 +1476,18 @@
       '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">"AI 자동 채점"에서 Gemini를 채점 엔진으로 쓰려면 여기에 키가 필요해요 (Google AI Studio, aistudio.google.com 에서 무료 발급). Claude와 달리 어디서든(claude.ai 안이든 배포된 사이트든) 이 키가 있어야 동작합니다. 현재 상태: <b style="color:' + (hasGeminiKey?'var(--approve)':'var(--reject)') + ';">' + (hasGeminiKey ? '설정됨' : '미설정') + '</b></p>' +
       '<div class="field"><label>Gemini API 키</label><input type="password" id="settings-gemini-key" placeholder="AIza..." value="' + escapeHtml(gs.apiKey||'') + '" /></div>' +
       '<div class="field"><label>모델명</label><input type="text" id="settings-gemini-model" placeholder="gemini-2.5-flash" value="' + escapeHtml(gs.model||'gemini-2.5-flash') + '" /></div>' +
-      '<p style="font-size:11px;color:var(--cream-soft);margin:-8px 0 12px;">모델 이름이 바뀌었거나 오류가 나면 이 값을 최신 모델명으로 바꿔보세요.</p>' +
-      (state.geminiMsg ? '<p class="acct-msg ' + state.geminiMsg.type + '">' + escapeHtml(state.geminiMsg.text) + '</p>' : '') +
+      '<button class="btn ghost small" id="gemini-list-models" style="margin-bottom:12px;" ' + (state.geminiModelListLoading?'disabled':'') + '>' + (state.geminiModelListLoading ? '불러오는 중...' : '내 키로 실제 사용 가능한 모델 확인') + '</button>';
+
+    if (state.geminiModelList){
+      if (state.geminiModelList.length === 0){
+        html += '<p style="font-size:12px;color:var(--reject);margin:-6px 0 12px;">이 키로 사용 가능한 생성 모델이 없어요. 키가 올바른지, Google AI Studio에서 발급한 키가 맞는지 확인해주세요.</p>';
+      } else {
+        html += '<div class="field"><label>불러온 모델 중에서 선택</label><select id="gemini-model-picker"><option value="">직접 위에 입력한 값 사용</option>' +
+          state.geminiModelList.map(function(m){ return '<option value="' + escapeHtml(m.name) + '" ' + (gs.model===m.name?'selected':'') + '>' + escapeHtml(m.name) + '</option>'; }).join('') +
+          '</select></div>';
+      }
+    }
+    html += (state.geminiMsg ? '<p class="acct-msg ' + state.geminiMsg.type + '">' + escapeHtml(state.geminiMsg.text) + '</p>' : '') +
       '<div style="display:flex;gap:8px;">' +
         '<button class="btn ghost small" id="gemini-save">저장하기</button>' +
         (hasGeminiKey ? '<button class="btn ghost small" id="gemini-clear" style="border-color:var(--reject);color:var(--reject);">키 삭제</button>' : '') +
@@ -1954,6 +1981,29 @@
     });
 
     // settings: Gemini key
+    var geminiListBtn = document.getElementById('gemini-list-models');
+    if (geminiListBtn) geminiListBtn.addEventListener('click', function(){
+      var key = document.getElementById('settings-gemini-key').value.trim();
+      if (!key){ state.geminiMsg = { type:'err', text:'먼저 API 키를 입력해주세요' }; render(); return; }
+      state.geminiModelListLoading = true;
+      state.geminiMsg = null;
+      render();
+      listGeminiModels(key).then(function(models){
+        state.geminiModelListLoading = false;
+        state.geminiModelList = models;
+        state.geminiMsg = { type:'ok', text: models.length + '개 모델을 찾았어요. 아래에서 골라주세요.' };
+        render();
+      }).catch(function(err){
+        state.geminiModelListLoading = false;
+        state.geminiModelList = null;
+        state.geminiMsg = { type:'err', text: '모델 목록을 불러오지 못했어요: ' + (err && err.message ? err.message : '오류') };
+        render();
+      });
+    });
+    var geminiPicker = document.getElementById('gemini-model-picker');
+    if (geminiPicker) geminiPicker.addEventListener('change', function(){
+      if (geminiPicker.value){ document.getElementById('settings-gemini-model').value = geminiPicker.value; }
+    });
     var geminiSaveBtn = document.getElementById('gemini-save');
     if (geminiSaveBtn) geminiSaveBtn.addEventListener('click', function(){
       var key = document.getElementById('settings-gemini-key').value.trim();
@@ -1969,6 +2019,7 @@
       state.geminiSettings = { apiKey: '', model: state.geminiSettings.model || 'gemini-2.5-flash' };
       saveGeminiSettings();
       state.geminiMsg = { type:'ok', text:'키를 삭제했어요.' };
+      state.geminiModelList = null;
       render();
     });
 
