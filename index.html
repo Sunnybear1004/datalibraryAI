@@ -264,6 +264,19 @@
   #archive-root .acct-msg { font-size: 12px; margin: -4px 0 12px; }
   #archive-root .acct-msg.ok { color: var(--approve); }
   #archive-root .acct-msg.err { color: var(--reject); }
+  #archive-root .model-list {
+    max-height: 240px; overflow-y: auto; border: 1px solid var(--line-dark); border-radius: 4px; margin-bottom: 14px;
+  }
+  #archive-root .model-list-item {
+    display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left; background: transparent;
+    border: none; border-bottom: 1px solid var(--line-dark); color: var(--cream); padding: 10px 12px; font-size: 12.5px;
+  }
+  #archive-root .model-list-item:last-child { border-bottom: none; }
+  #archive-root .model-list-item:hover { background: rgba(200,155,60,0.08); }
+  #archive-root .model-list-item.active { background: rgba(200,155,60,0.18); }
+  #archive-root .model-list-item .mn { font-family: var(--font-mono); color: var(--gold); }
+  #archive-root .model-list-item .md { color: var(--cream-soft); font-size: 11.5px; }
+  #archive-root .model-list-item .mc { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--approve); white-space: nowrap; }
 
   #archive-root .toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--paper); color: var(--ink);
@@ -1502,9 +1515,17 @@
       if (state.geminiModelList.length === 0){
         html += '<p style="font-size:12px;color:var(--reject);margin:-6px 0 12px;">이 키로 사용 가능한 생성 모델이 없어요. 키가 올바른지, Google AI Studio에서 발급한 키가 맞는지 확인해주세요.</p>';
       } else {
-        html += '<div class="field"><label>불러온 모델 중에서 선택</label><select id="gemini-model-picker"><option value="">직접 위에 입력한 값 사용</option>' +
-          state.geminiModelList.map(function(m){ return '<option value="' + escapeHtml(m.name) + '" ' + (gs.model===m.name?'selected':'') + '>' + escapeHtml(m.name) + '</option>'; }).join('') +
-          '</select></div>';
+        html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;font-family:var(--font-mono);color:var(--cream-soft);margin-bottom:6px;">사용 가능한 모델 (' + state.geminiModelList.length + '개) — 클릭해서 선택</div>' +
+          '<div class="model-list">' +
+          state.geminiModelList.map(function(m){
+            var active = gs.model === m.name;
+            return '<button type="button" class="model-list-item' + (active ? ' active' : '') + '" data-model-name="' + escapeHtml(m.name) + '">' +
+              '<span class="mn">' + escapeHtml(m.name) + '</span>' +
+              (m.displayName && m.displayName !== m.name ? '<span class="md">' + escapeHtml(m.displayName) + '</span>' : '') +
+              (active ? '<span class="mc">✓ 선택됨</span>' : '') +
+            '</button>';
+          }).join('') +
+          '</div>';
       }
     }
     html += (state.geminiMsg ? '<p class="acct-msg ' + state.geminiMsg.type + '">' + escapeHtml(state.geminiMsg.text) + '</p>' : '') +
@@ -2020,9 +2041,22 @@
         render();
       });
     });
-    var geminiPicker = document.getElementById('gemini-model-picker');
-    if (geminiPicker) geminiPicker.addEventListener('change', function(){
-      if (geminiPicker.value){ document.getElementById('settings-gemini-model').value = geminiPicker.value; }
+    document.querySelectorAll('.model-list-item').forEach(function(item){
+      item.addEventListener('click', function(){
+        var name = item.getAttribute('data-model-name');
+        var modelInput = document.getElementById('settings-gemini-model');
+        if (modelInput) modelInput.value = name;
+        document.querySelectorAll('.model-list-item').forEach(function(el){
+          el.classList.remove('active');
+          var mc = el.querySelector('.mc');
+          if (mc) mc.remove();
+        });
+        item.classList.add('active');
+        var span = document.createElement('span');
+        span.className = 'mc';
+        span.textContent = '✓ 선택됨';
+        item.appendChild(span);
+      });
     });
     var geminiSaveBtn = document.getElementById('gemini-save');
     if (geminiSaveBtn) geminiSaveBtn.addEventListener('click', function(){
