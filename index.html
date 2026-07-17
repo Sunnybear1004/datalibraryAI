@@ -498,6 +498,7 @@
     geminiMsg: null,
     geminiModelList: null,
     geminiModelListLoading: false,
+    geminiTestLoading: false,
     rejFilter: 'all',
     acctEmailMsg: null, acctEmailLoading: false,
     acctPwMsg: null, acctPwLoading: false,
@@ -1230,6 +1231,25 @@
   // (no live web search — that needs a separate grounding tool most free keys don't have).
   // Model names/availability vary by key, so instead of guessing, let the
   // person pull the real list for their own key and pick one that works.
+  // Fires one minimal generateContent call to confirm the key+model combo
+  // actually works, surfacing a 404 (wrong model) vs other errors clearly.
+  async function testGeminiConnection(apiKey, model){
+    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({ contents: [{ parts: [{ text: 'ping' }] }] })
+    });
+    var data = null;
+    try { data = await response.json(); } catch(e){}
+    if (!response.ok){
+      var msg = (data && data.error && data.error.message) ? data.error.message : (response.status + ' ' + response.statusText);
+      var err = new Error(msg);
+      err.status = response.status;
+      throw err;
+    }
+    return true;
+  }
+
   async function listGeminiModels(apiKey){
     var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
       method: 'GET',
@@ -1489,7 +1509,7 @@
     }
     html += (state.geminiMsg ? '<p class="acct-msg ' + state.geminiMsg.type + '">' + escapeHtml(state.geminiMsg.text) + '</p>' : '') +
       '<div style="display:flex;gap:8px;">' +
-        '<button class="btn ghost small" id="gemini-save">저장하기</button>' +
+        '<button class="btn ghost small" id="gemini-save" ' + (state.geminiTestLoading?'disabled':'') + '>' + (state.geminiTestLoading ? '연결 확인 중...' : '저장하기') + '</button>' +
         (hasGeminiKey ? '<button class="btn ghost small" id="gemini-clear" style="border-color:var(--reject);color:var(--reject);">키 삭제</button>' : '') +
       '</div></div>';
 
@@ -2011,8 +2031,21 @@
       if (!key){ state.geminiMsg = { type:'err', text:'API 키를 입력해주세요' }; render(); return; }
       state.geminiSettings = { apiKey: key, model: model };
       saveGeminiSettings();
-      state.geminiMsg = { type:'ok', text:'저장했어요. 이제 AI 자동 채점에서 Gemini를 선택할 수 있어요.' };
+      state.geminiTestLoading = true;
+      state.geminiMsg = { type:'ok', text:'저장했어요. 이 모델로 연결을 확인하는 중...' };
       render();
+      testGeminiConnection(key, model).then(function(){
+        state.geminiTestLoading = false;
+        state.geminiMsg = { type:'ok', text:'저장 완료 — 연결 확인됨, "' + model + '" 모델이 정상 동작해요 ✓' };
+        render();
+      }).catch(function(err){
+        state.geminiTestLoading = false;
+        var hint = err.status === 404
+          ? ' 이 키에서 "' + model + '" 모델을 찾을 수 없어요 — 위의 "내 키로 실제 사용 가능한 모델 확인"으로 맞는 이름을 다시 골라주세요.'
+          : '';
+        state.geminiMsg = { type:'err', text:'설정은 저장됐지만 연결 확인에 실패했어요 (' + (err && err.message ? err.message : '오류') + ').' + hint };
+        render();
+      });
     });
     var geminiClearBtn = document.getElementById('gemini-clear');
     if (geminiClearBtn) geminiClearBtn.addEventListener('click', function(){
