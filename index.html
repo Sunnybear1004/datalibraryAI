@@ -589,7 +589,8 @@
   function showToast(msg){
     state.toast = msg;
     render();
-    setTimeout(function(){ state.toast = null; renderToastOnly(); }, 1800);
+    var duration = Math.max(1800, Math.min(6000, msg.length * 60));
+    setTimeout(function(){ state.toast = null; renderToastOnly(); }, duration);
   }
 
   function renderToastOnly(){
@@ -1599,7 +1600,7 @@
           var scores = scoresList[0] || (function(){ var s={}; CRITERIA.forEach(function(c){ s[c.key]=60; }); return s; })();
           finalizeAdd(scores);
         }).catch(function(err){
-          showToast('AI 채점에 실패해서 기본 점수로 등록했어요');
+          showToast('AI 채점에 실패해서 기본 점수로 등록했어요: ' + (err && err.message ? err.message : '오류'));
           var scores = {}; CRITERIA.forEach(function(c){ scores[c.key] = 60; });
           finalizeAdd(scores);
         });
@@ -1701,7 +1702,7 @@
             finishSuccess(created);
           }).catch(function(err){
             created.forEach(function(m){ delete m.content; });
-            state.home.statusMsg = 'AI 채점에 실패해서 기본 점수로 등록했어요';
+            showToast('AI 채점에 실패해서 기본 점수로 등록했어요: ' + (err && err.message ? err.message : '오류'));
             finishSuccess(created);
           });
         }).catch(function(err){ finishError(err, '네트워크 또는 키를 확인해주세요'); });
@@ -1830,7 +1831,7 @@
           created.forEach(function(m, i){ if (scoresList[i]) m.scores = scoresList[i]; });
           finalize(created);
         }).catch(function(err){
-          showToast('AI 채점에 실패해서 기본 점수로 등록했어요');
+          showToast('AI 채점에 실패해서 기본 점수로 등록했어요: ' + (err && err.message ? err.message : '오류'));
           finalize(created);
         });
       }).catch(function(err){
