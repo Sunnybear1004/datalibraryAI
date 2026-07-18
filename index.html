@@ -1143,14 +1143,15 @@
     return set;
   }
 
-  // Filters Tavily results that were already imported before (by URL).
-  function dedupeTavilyItems(items){
-    var seen = existingUrlSet();
+  // Filters items against a running "seen" set, marking kept URLs as seen
+  // too so repeated items within the same batch (or across backfill retries)
+  // don't get double-counted.
+  function dedupeAgainstSeen(items, seen){
     var kept = [], skipped = 0;
     items.forEach(function(it){
       var n = normalizeUrl(it.url);
       if (n && seen[n]){ skipped++; return; }
-      if (n) seen[n] = true; // guard against duplicates within the same result batch too
+      if (n) seen[n] = true;
       kept.push(it);
     });
     return { kept: kept, skipped: skipped };
@@ -1166,6 +1167,34 @@
     if (data.error) throw new Error(typeof data.error === 'string' ? data.error : 'Tavily API error');
     if (!data.results) throw new Error('예상치 못한 응답 형식이에요');
     return data.results;
+  }
+
+  // Keeps asking Tavily for a wider result window until it has `targetCount`
+  // genuinely-new (not-already-imported) items, since Tavily has no
+  // pagination/offset — the only lever is requesting more results per call.
+  // Gives up after a few tries so a thin topic can't loop forever.
+  async function tavilyCollectWithBackfill(apiKey, query, targetCount, onProgress){
+    var seen = existingUrlSet();
+    var collected = [];
+    var totalSkipped = 0;
+    var attempts = 0;
+    var maxAttempts = 4;
+    var maxWindow = 20; // Tavily's practical ceiling for max_results
+    var requestSize = targetCount;
+
+    while (collected.length < targetCount && attempts < maxAttempts){
+      attempts++;
+      if (onProgress) onProgress(attempts, collected.length);
+      var items = await tavilySearch(apiKey, query, requestSize);
+      var res = dedupeAgainstSeen(items, seen);
+      totalSkipped += res.skipped;
+      var needed = targetCount - collected.length;
+      collected = collected.concat(res.kept.slice(0, needed));
+      if (res.kept.length === 0 && requestSize >= maxWindow) break; // no more to find
+      requestSize = Math.min(maxWindow, requestSize + targetCount);
+    }
+
+    return { items: collected, skipped: totalSkipped, attempts: attempts, shortBy: Math.max(0, targetCount - collected.length) };
   }
 
   // ---------- Personalization: turn the learned model into a search brief ----------
@@ -1885,9 +1914,10 @@
         var aiEngine = document.getElementById('home-ai-engine') ? document.getElementById('home-ai-engine').value : 'claude';
         if (!apiKey){ state.home.loading = false; state.home.statusMsg = '설정 탭에서 Tavily API 키를 먼저 등록해주세요'; render(); return; }
         var query = buildTavilyQuery(brief, keyword);
-        tavilySearch(apiKey, query, count).then(function(items){
-          var dedup = dedupeTavilyItems(items);
-          var created = dedup.kept.map(function(it){
+        tavilyCollectWithBackfill(apiKey, query, count, function(attempt){
+          if (attempt > 1) state.home.statusMsg = '중복 제외하고 ' + count + '개를 채우기 위해 더 찾는 중... (' + attempt + '차 시도)';
+        }).then(function(dedup){
+          var created = dedup.items.map(function(it){
             var scores = {};
             CRITERIA.forEach(function(c){ scores[c.key] = 60; });
             var host = null;
@@ -1900,7 +1930,7 @@
             render();
             return;
           }
-          var dedupSuffix = dedup.skipped > 0 ? (' (중복 ' + dedup.skipped + '개 제외)') : '';
+          var dedupSuffix = dedup.skipped > 0 ? (' (중복 ' + dedup.skipped + '개 제외' + (dedup.shortBy > 0 ? ', 더 찾지 못해 ' + dedup.shortBy + '개 부족' : '') + ')') : '';
           if (!aiScore){
             created.forEach(function(m){ delete m.content; });
             finishSuccess(created, dedupSuffix);
@@ -2019,9 +2049,10 @@
       var statusEl = document.getElementById('tavily-status');
       tavilyBtn.disabled = true; tavilyBtn.textContent = '검색 중...';
       if (statusEl) statusEl.textContent = 'Tavily에서 "' + keyword + '" 관련 자료를 찾고 있어요...';
-      tavilySearch(apiKey, keyword, count).then(function(items){
-        var dedup = dedupeTavilyItems(items);
-        var created = dedup.kept.map(function(it){
+      tavilyCollectWithBackfill(apiKey, keyword, count, function(attempt){
+        if (attempt > 1 && statusEl) statusEl.textContent = '중복 제외하고 ' + count + '개를 채우기 위해 더 찾는 중... (' + attempt + '차 시도)';
+      }).then(function(dedup){
+        var created = dedup.items.map(function(it){
           var scores = {};
           CRITERIA.forEach(function(c){ scores[c.key] = 60; });
           var host = null;
@@ -2033,7 +2064,7 @@
           render();
           return;
         }
-        var dedupSuffix = dedup.skipped > 0 ? (' (중복 ' + dedup.skipped + '개 제외)') : '';
+        var dedupSuffix = dedup.skipped > 0 ? (' (중복 ' + dedup.skipped + '개 제외' + (dedup.shortBy > 0 ? ', 더 찾지 못해 ' + dedup.shortBy + '개 부족' : '') + ')') : '';
 
         function finalize(list, suffix){
           list.forEach(function(m){ delete m.content; });
