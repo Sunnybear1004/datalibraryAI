@@ -367,11 +367,10 @@
 
   function uid(){ return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-  // Every AI/search call (Claude, Gemini, Tavily) goes through a small
-  // Cloudflare Worker so the real API keys stay on the server and never
-  // reach the browser. The worker checks the caller's Firebase ID token
-  // against Google before doing anything, so only signed-in users of THIS
-  // app can use it.
+  // Tavily search goes through a small Cloudflare Worker so the Tavily key
+  // stays on the server and never reaches the browser. The worker checks
+  // the caller's Firebase ID token against Google first, so only
+  // signed-in users of THIS app can use it.
   //
   // IMPORTANT: replace this with your own deployed Worker's URL after
   // running `npx wrangler deploy` in the cf-proxy folder (see its README).
@@ -392,6 +391,51 @@
         }
         return body;
       });
+    });
+  }
+
+  // Gemini is called DIRECTLY from the browser instead of through the
+  // Cloudflare Worker — Google blocks Cloudflare's server IPs for the
+  // Gemini API ("User location is not supported"), but works fine from a
+  // real visitor's browser. To keep the key from being freely reusable on
+  // other sites, restrict it to this app's domain(s) under Google Cloud
+  // Console → APIs & Services → Credentials → this key → "Application
+  // restrictions" → "Websites" (HTTP referrers), e.g. your-username.github.io/*
+  //
+  // IMPORTANT: put your own Gemini key here after setting that restriction.
+  var GEMINI_API_KEY = 'AQ.Ab8RN6LhnJbgtMkgITrAFGHNSt_rvq6pOcp2R3oUUkkIQ-IxwQ';
+
+  function geminiFetch(prompt, model, jsonMode){
+    var body = { contents: [{ parts: [{ text: prompt }] }] };
+    if (jsonMode) body.generationConfig = { responseMimeType: 'application/json' };
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+      encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function(res){
+      return res.json().then(function(data){
+        if (data.error) throw new Error(data.error.message || 'Gemini API 오류');
+        var text;
+        try {
+          text = data.candidates[0].content.parts.map(function(p){ return p.text || ''; }).join('\n').trim();
+        } catch(e){
+          throw new Error('예상치 못한 Gemini 응답 형식이에요.');
+        }
+        return { text: text };
+      });
+    });
+  }
+
+  function geminiListModelsDirect(){
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(GEMINI_API_KEY);
+    return fetch(url).then(function(res){ return res.json(); }).then(function(data){
+      if (data.error) throw new Error(data.error.message || 'Gemini API 오류');
+      if (!data.models) throw new Error('모델 목록을 받지 못했어요.');
+      return data.models
+        .filter(function(m){ return (m.supportedGenerationMethods || []).indexOf('generateContent') !== -1; })
+        .map(function(m){ return { name: (m.name || '').replace(/^models\//, ''), displayName: m.displayName || m.name }; });
     });
   }
 
@@ -525,7 +569,7 @@
     toast: null,
     compare: { mode:'free', field:'all', a:null, b:null, critAnswers:{}, overall:null },
     bulk: { mode: 'urls' },
-    home: { engine: 'claude', field: '', keyword: '', count: 5, loading: false, statusMsg: null, lastAdded: [] },
+    home: { engine: 'tavily', field: '', keyword: '', count: 5, loading: false, statusMsg: null, lastAdded: [] },
     geminiSettings: { model: 'gemini-2.5-flash' },
     geminiMsg: null,
     geminiModelList: null,
@@ -899,19 +943,11 @@
     '</div>' +
     '<p style="font-size:12px;color:var(--cream-soft);margin:-8px 0 16px;">키워드를 비워두면 학습된 성향만으로, 입력하면 그 키워드를 성향과 함께 반영해서 찾아요.</p>';
 
-    html += '<div class="compare-controls"><div class="mode-toggle">' +
-      '<button data-homeengine="claude" class="' + (h.engine==='claude'?'active':'') + '">Claude로 찾기</button>' +
-      '<button data-homeengine="tavily" class="' + (h.engine==='tavily'?'active':'') + '">Tavily로 찾기</button>' +
-    '</div></div>';
-
     html += '<div class="field" style="max-width:200px;"><label>수집 개수 (최대 10)</label><input type="text" id="home-count" value="' + h.count + '" /></div>';
-    if (h.engine === 'tavily'){
-      html += '<div class="toggle-row"><input type="checkbox" id="home-ai-score" checked /><label for="home-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기</label></div>' +
-        '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="home-ai-engine">' +
-          '<option value="gemini" selected>Gemini</option>' +
-          '<option value="claude">Claude</option>' +
-        '</select></div>';
-    }
+    html += '<div class="toggle-row"><input type="checkbox" id="home-ai-score" checked /><label for="home-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기</label></div>' +
+      '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="home-ai-engine">' +
+        '<option value="gemini" selected>Gemini</option>' +
+      '</select></div>';
     html += '<button class="btn" id="home-collect" ' + (h.loading?'disabled':'') + '>' + (h.loading ? '찾는 중...' : '내 성향에 맞는 자료 찾기') + '</button>';
     if (h.statusMsg) html += '<p style="margin-top:10px;font-size:12px;color:var(--cream-soft);">' + escapeHtml(h.statusMsg) + '</p>';
 
@@ -978,7 +1014,6 @@
       '<div id="ai-score-wrap" style="display:none;">' +
         '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="f-score-engine">' +
           '<option value="gemini" selected>Gemini</option>' +
-          '<option value="claude">Claude</option>' +
         '</select></div>' +
         '<p id="ai-score-note" style="font-size:12px;color:var(--cream-soft);margin:-8px 0 16px;">제목·출처·URL을 바탕으로 AI가 8개 요소 점수를 추정해요.</p>' +
       '</div>' +
@@ -995,7 +1030,6 @@
       '<div class="compare-controls"><div class="mode-toggle">' +
         '<button data-bulkmode="urls" class="' + (b.mode==='urls'?'active':'') + '">URL 목록으로 추가</button>' +
         '<button data-bulkmode="generate" class="' + (b.mode==='generate'?'active':'') + '">샘플 자동 생성</button>' +
-        '<button data-bulkmode="keyword" class="' + (b.mode==='keyword'?'active':'') + '">키워드 자동 수집 (Claude)</button>' +
         '<button data-bulkmode="tavily" class="' + (b.mode==='tavily'?'active':'') + '">키워드 자동 수집 (Tavily)</button>' +
       '</div></div>';
 
@@ -1009,7 +1043,6 @@
         '<div class="toggle-row"><input type="checkbox" id="bulk-ai-score" checked /><label for="bulk-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기</label></div>' +
         '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="bulk-ai-engine">' +
           '<option value="gemini" selected>Gemini</option>' +
-          '<option value="claude">Claude</option>' +
         '</select></div>' +
         '<button class="btn" id="bulk-add-urls">목록 추가하기</button>' +
         '<div id="bulk-urls-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
@@ -1020,12 +1053,6 @@
         '</div>' +
         '<p style="font-size:12px;color:var(--cream-soft);margin-bottom:14px;">평가 요소 점수가 무작위로 채워진 샘플 자료를 생성합니다. 카드 평가·상대 비교 기능을 테스트하거나 학습 데이터를 빠르게 늘리고 싶을 때 사용하세요.</p>' +
         '<button class="btn" id="bulk-generate">샘플 자동 생성하기</button>';
-    } else if (b.mode === 'keyword') {
-      html += '<p class="bulk-note" style="border-color:var(--gold-soft);">Claude API의 웹 검색 기능을 이용해 실제 인터넷에서 키워드 관련 자료를 찾아 자동으로 등록합니다. 별도 API 키 없이 바로 동작해요. 분야·평가 점수는 검색된 내용을 바탕으로 AI가 추정한 값이라서, 등록 후에도 카드 평가·상대 비교로 직접 검증하는 걸 권장해요.</p>' +
-        '<div class="field"><label>검색 키워드</label><input type="text" id="kw-input" placeholder="예: 양자컴퓨팅 상용화, 금리 인상 부동산" /></div>' +
-        '<div class="field"><label>수집 개수 (최대 10)</label><input type="text" id="kw-count" value="5" /></div>' +
-        '<button class="btn" id="kw-collect">자동 수집하기</button>' +
-        '<div id="kw-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
     } else {
       html += '<p class="bulk-note" style="border-color:var(--gold-soft);">Tavily는 AI 앱을 위해 만들어진 검색 API로, 깔끔한 JSON 결과(제목·URL·요약)를 돌려줍니다.</p>' +
         '<div class="field"><label>적용할 분야</label><select id="tavily-field">' + fieldOptions + '</select></div>' +
@@ -1034,7 +1061,6 @@
         '<div class="toggle-row"><input type="checkbox" id="tavily-ai-score" checked /><label for="tavily-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기</label></div>' +
         '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="tavily-ai-engine">' +
           '<option value="gemini" selected>Gemini</option>' +
-          '<option value="claude">Claude</option>' +
         '</select></div>' +
         '<button class="btn" id="tavily-collect">Tavily로 검색하기</button>' +
         '<div id="tavily-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
@@ -1084,22 +1110,6 @@
     return out;
   }
 
-
-  async function collectByKeyword(keyword, count){
-    var fieldsList = Object.keys(FIELD_TREE).join(', ');
-    var prompt = '다음 키워드와 관련된 실제 자료(뉴스 기사, 논문, 보고서 등)를 웹에서 검색해서 최대 ' + count + '개 찾아줘. 키워드: "' + keyword + '"\n\n' +
-      '각 자료에 대해 아래 JSON 스키마로만 응답해. 설명, 마크다운, 코드펜스 없이 순수 JSON 배열만 출력해.\n' +
-      '[{"title":"자료 제목","source":"출처(언론사/저널명 등)","url":"실제 검색으로 확인한 URL","field":"다음 중 하나: ' + fieldsList + '",' +
-      '"scores":{"trust":0-100,"appropriateness":0-100,"recency":0-100,"objectivity":0-100,"expertise":0-100,"clarity":0-100,"lowBias":0-100,"interest":0-100}}]\n' +
-      'scores는 검색된 내용을 바탕으로 합리적으로 추정한 값이어야 하고, url은 검색으로 실제 확인된 링크만 사용해.';
-
-    var data = await callFn('claudeGenerate', { prompt: prompt, maxTokens: 2000 });
-    var text = data.text || '';
-    var clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    var arr = JSON.parse(clean);
-    if (!Array.isArray(arr)) throw new Error('invalid response shape');
-    return arr;
-  }
 
   function normalizeUrl(u){
     if (!u) return '';
@@ -1199,38 +1209,6 @@
     return { field: field, criteria: criteria, sampleTitles: topFitTitles };
   }
 
-  async function collectByProfile(brief, count, keyword){
-    var fieldsList = Object.keys(FIELD_TREE).join(', ');
-    var criteriaText = brief.criteria.length
-      ? brief.criteria.map(function(c){ return c.label; }).join(', ')
-      : '(아직 뚜렷한 기준 없음 — 균형 잡힌 자료로 찾아줘)';
-    var samplesText = brief.sampleTitles.length
-      ? brief.sampleTitles.map(function(t){ return '- ' + t; }).join('\n')
-      : '(아직 평가 이력 없음)';
-    var keywordLine = keyword ? '- 사용자가 지금 지정한 키워드: "' + keyword + '" (이 주제를 우선적으로 반영해줘)\n' : '';
-    var taskLine = keyword
-      ? '"' + keyword + '"와 관련된 자료 중에서, 위 프로필(선호 분야·평가 기준)에 잘 맞을 만한 것을 웹에서 검색해서 최대 ' + count + '개 찾아줘.'
-      : '이 프로필에 맞는 새로운 자료(뉴스 기사, 논문, 보고서 등)를 웹에서 검색해서 최대 ' + count + '개 찾아줘. 위 예시와 완전히 같은 주제만 반복하지 말고, 같은 취향 안에서 다양하게 골라줘.';
-    var prompt = '다음은 한 사용자의 자료 평가 성향 프로필이야.\n' +
-      '- 선호 분야: ' + (brief.field || '미정 — 다양한 분야 중 흥미로운 것') + '\n' +
-      '- 중요하게 여기는 평가 기준(가중치 높은 순): ' + criteriaText + '\n' +
-      keywordLine +
-      '- 최근 높게 평가한 자료 예시:\n' + samplesText + '\n\n' +
-      taskLine + '\n\n' +
-      '각 자료에 대해 아래 JSON 스키마로만 응답해. 설명, 마크다운, 코드펜스 없이 순수 JSON 배열만 출력해.\n' +
-      '[{"title":"자료 제목","source":"출처(언론사/저널명 등)","url":"실제 검색으로 확인한 URL","field":"다음 중 하나: ' + fieldsList + '",' +
-      '"matchReason":"이 자료를 고른 이유를 한 문장으로 (예: 전문성과 신뢰성이 높은 자료라서)",' +
-      '"scores":{"trust":0-100,"appropriateness":0-100,"recency":0-100,"objectivity":0-100,"expertise":0-100,"clarity":0-100,"lowBias":0-100,"interest":0-100}}]\n' +
-      'scores는 검색된 내용을 바탕으로 합리적으로 추정한 값이어야 하고, url은 검색으로 실제 확인된 링크만 사용해.';
-
-    var data = await callFn('claudeGenerate', { prompt: prompt, maxTokens: 2200 });
-    var text = data.text || '';
-    var clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    var arr = JSON.parse(clean);
-    if (!Array.isArray(arr)) throw new Error('invalid response shape');
-    return arr;
-  }
-
   function buildTavilyQuery(brief, keyword){
     if (keyword) {
       var kwParts = [keyword];
@@ -1247,40 +1225,6 @@
 
   // Batch-scores materials that came in without AI-estimated scores (URL list, Tavily).
   // Uses any snippet text already on hand; falls back to web search per item when needed.
-  async function estimateScoresBatchClaude(items){
-    var listText = items.map(function(it, i){
-      return '[' + (i+1) + '] 제목: ' + it.title +
-        '\n출처: ' + (it.source || '미상') +
-        '\nURL: ' + (it.url || '없음') +
-        (it.content ? '\n요약: ' + it.content.slice(0, 400) : '');
-    }).join('\n\n');
-
-    var prompt = '다음은 자료 서고에 새로 등록하려는 자료 목록이야. 각 자료에 대해 아래 8개 평가 요소를 0~100점으로 추정해줘: ' +
-      '신뢰성(trust), 적절성(appropriateness), 최신성(recency), 객관성(objectivity), 전문성(expertise), 이해하기 쉬움(clarity), 편향성 낮음(lowBias), 관심도(interest).\n' +
-      '이미 요약이 있는 항목은 그 내용을 근거로 판단하고, 요약이 없는 항목은 필요하면 웹 검색으로 확인해서 판단해줘.\n\n' +
-      listText + '\n\n' +
-      '아래 JSON 배열로만 응답해. 설명, 마크다운, 코드펜스 없이 순수 JSON만 출력해.\n' +
-      '[{"index":1,"scores":{"trust":0-100,"appropriateness":0-100,"recency":0-100,"objectivity":0-100,"expertise":0-100,"clarity":0-100,"lowBias":0-100,"interest":0-100}}]';
-
-    var data = await callFn('claudeGenerate', { prompt: prompt, maxTokens: 2200 });
-    var text = data.text || '';
-    var clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    var arr = JSON.parse(clean);
-    if (!Array.isArray(arr)) throw new Error('invalid response shape');
-    var byIndex = {};
-    arr.forEach(function(r){ if (r && r.index) byIndex[r.index] = r.scores; });
-    return items.map(function(it, i){
-      var s = byIndex[i+1];
-      if (!s) return null;
-      var scores = {};
-      CRITERIA.forEach(function(c){
-        var v = typeof s[c.key] === 'number' ? s[c.key] : 60;
-        scores[c.key] = Math.max(0, Math.min(100, Math.round(v)));
-      });
-      return scores;
-    });
-  }
-
   // Gemini Developer API — generateContent with responseMimeType:'application/json'
   // for reliable structured output. Judges from title/source/any snippet on hand
   // (no live web search — that needs a separate grounding tool most free keys don't have).
@@ -1289,13 +1233,12 @@
   // Fires one minimal generateContent call to confirm the key+model combo
   // actually works, surfacing a 404 (wrong model) vs other errors clearly.
   async function testGeminiConnection(model){
-    await callFn('geminiGenerate', { prompt: 'ping', model: model });
+    await geminiFetch('ping', model);
     return true;
   }
 
   async function listGeminiModels(){
-    var data = await callFn('geminiListModels', {});
-    return data.models || [];
+    return geminiListModelsDirect();
   }
 
   async function estimateScoresBatchGemini(items){
@@ -1316,7 +1259,7 @@
       '아래 JSON 배열로만 응답해:\n' +
       '[{"index":1,"scores":{"trust":0-100,"appropriateness":0-100,"recency":0-100,"objectivity":0-100,"expertise":0-100,"clarity":0-100,"lowBias":0-100,"interest":0-100}}]';
 
-    var data = await callFn('geminiGenerate', { prompt: prompt, model: model, jsonMode: true });
+    var data = await geminiFetch(prompt, model, true);
     var text = data.text || '';
     var clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     var arr = JSON.parse(clean);
@@ -1336,7 +1279,7 @@
   }
 
   function estimateScoresBatch(items, engine){
-    return engine === 'gemini' ? estimateScoresBatchGemini(items) : estimateScoresBatchClaude(items);
+    return estimateScoresBatchGemini(items);
   }
 
   // Card-level summary. No live browsing available, so this is explicitly
@@ -1351,7 +1294,7 @@
       (material.url ? 'URL: ' + material.url + '\n' : '') +
       '\n요약 텍스트만 출력해. 따옴표나 다른 설명 없이.';
 
-    var data = await callFn('geminiGenerate', { prompt: prompt, model: model });
+    var data = await geminiFetch(prompt, model);
     var text = (data.text || '').trim();
     if (!text) throw new Error('빈 응답을 받았어요');
     return text;
@@ -1503,7 +1446,7 @@
   function settingsTabHtml(){
     var html = '<p class="section-title">AI 연동</p>';
     html += '<div class="acct-block"><div class="acct-label">검색·채점 엔진</div>' +
-      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">Claude · Gemini · Tavily API 키는 별도 프록시 서버에 안전하게 저장되어 있어서, 이 계정으로 로그인한 사람은 별도 키 등록 없이 바로 "키워드 자동 수집", "AI 자동 채점", "AI 요약"을 쓸 수 있어요.</p></div>';
+      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">Tavily 검색은 별도 프록시 서버를 거쳐서 동작하고, Gemini 채점·요약은 이 사이트 전용으로 제한된 키를 통해 바로 동작해요. 둘 다 이 계정으로 로그인한 사람이라면 별도 키 등록 없이 바로 "키워드 자동 수집", "AI 자동 채점", "AI 요약"을 쓸 수 있어요.</p></div>';
 
     var gs = state.geminiSettings || { model: 'gemini-2.5-flash' };
     html += '<div class="acct-block"><div class="acct-label">Gemini 모델 선택</div>' +
@@ -1692,7 +1635,7 @@
       }
 
       if (mode === 'ai'){
-        var addEngine = document.getElementById('f-score-engine') ? document.getElementById('f-score-engine').value : 'claude';
+        var addEngine = document.getElementById('f-score-engine') ? document.getElementById('f-score-engine').value : 'gemini';
         addBtn.disabled = true; addBtn.textContent = 'AI가 점수를 매기는 중...';
         if (addStatusEl) addStatusEl.textContent = 'AI가 출처·내용을 바탕으로 점수를 판단하고 있어요...';
         estimateScoresBatch([{ title: title, source: source, url: urlVal }], addEngine).then(function(scoresList){
@@ -1716,11 +1659,6 @@
     });
 
     // home tab
-    document.querySelectorAll('[data-homeengine]').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        state.home.engine = btn.getAttribute('data-homeengine'); render();
-      });
-    });
     var homeFieldEl = document.getElementById('home-field');
     if (homeFieldEl) homeFieldEl.addEventListener('change', function(){ state.home.field = homeFieldEl.value; });
     var homeCountEl = document.getElementById('home-count');
@@ -1756,58 +1694,43 @@
         render();
       }
 
-      if (state.home.engine === 'claude'){
-        collectByProfile(brief, count, keyword).then(function(arr){
-          var created = arr.map(function(item){
-            var field = FIELD_TREE.hasOwnProperty(item.field) ? item.field : (brief.field || Object.keys(FIELD_TREE)[0]);
-            var scores = {};
-            CRITERIA.forEach(function(c){
-              var v = item.scores && typeof item.scores[c.key] === 'number' ? item.scores[c.key] : 60;
-              scores[c.key] = Math.max(0, Math.min(100, Math.round(v)));
-            });
-            return { id: uid(), title: item.title || '제목 없음', field: field, subfield: null, source: item.source || '미상', url: item.url || null, matchReason: item.matchReason || null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
-          });
-          finishSuccess(created);
-        }).catch(function(err){ finishError(err); });
-      } else {
-        var aiScore = document.getElementById('home-ai-score') ? document.getElementById('home-ai-score').checked : false;
-        var aiEngine = document.getElementById('home-ai-engine') ? document.getElementById('home-ai-engine').value : 'claude';
-        var query = buildTavilyQuery(brief, keyword);
-        tavilyCollectWithBackfill(query, count, function(attempt){
-          if (attempt > 1) state.home.statusMsg = '중복 제외하고 ' + count + '개를 채우기 위해 더 찾는 중... (' + attempt + '차 시도)';
-        }).then(function(dedup){
-          var created = dedup.items.map(function(it){
-            var scores = {};
-            CRITERIA.forEach(function(c){ scores[c.key] = 60; });
-            var host = null;
-            try { host = new URL(it.url).hostname.replace(/^www\./,''); } catch(e){ host = null; }
-            return { id: uid(), title: it.title || query, field: brief.field || Object.keys(FIELD_TREE)[0], subfield: null, source: host || '미상', url: it.url || null, content: it.content || null, matchReason: null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
-          });
-          if (created.length === 0){
-            state.home.loading = false;
-            state.home.statusMsg = dedup.skipped > 0 ? ('새로 찾은 자료가 모두 이미 등록된 자료였어요 (' + dedup.skipped + '개 중복 제외)') : '검색 결과가 없어요';
-            render();
-            return;
-          }
-          var dedupSuffix = dedup.skipped > 0 ? (' (중복 ' + dedup.skipped + '개 제외' + (dedup.shortBy > 0 ? ', 더 찾지 못해 ' + dedup.shortBy + '개 부족' : '') + ')') : '';
-          if (!aiScore){
-            created.forEach(function(m){ delete m.content; });
-            finishSuccess(created, dedupSuffix);
-            return;
-          }
-          state.home.statusMsg = 'AI가 ' + created.length + '개 자료의 점수를 판단하고 있어요...';
+      var aiScore = document.getElementById('home-ai-score') ? document.getElementById('home-ai-score').checked : false;
+      var aiEngine = document.getElementById('home-ai-engine') ? document.getElementById('home-ai-engine').value : 'gemini';
+      var query = buildTavilyQuery(brief, keyword);
+      tavilyCollectWithBackfill(query, count, function(attempt){
+        if (attempt > 1) state.home.statusMsg = '중복 제외하고 ' + count + '개를 채우기 위해 더 찾는 중... (' + attempt + '차 시도)';
+      }).then(function(dedup){
+        var created = dedup.items.map(function(it){
+          var scores = {};
+          CRITERIA.forEach(function(c){ scores[c.key] = 60; });
+          var host = null;
+          try { host = new URL(it.url).hostname.replace(/^www\./,''); } catch(e){ host = null; }
+          return { id: uid(), title: it.title || query, field: brief.field || Object.keys(FIELD_TREE)[0], subfield: null, source: host || '미상', url: it.url || null, content: it.content || null, matchReason: null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
+        });
+        if (created.length === 0){
+          state.home.loading = false;
+          state.home.statusMsg = dedup.skipped > 0 ? ('새로 찾은 자료가 모두 이미 등록된 자료였어요 (' + dedup.skipped + '개 중복 제외)') : '검색 결과가 없어요';
           render();
-          estimateScoresBatch(created, aiEngine).then(function(scoresList){
-            var suffix = applyAiScores(created, scoresList);
-            created.forEach(function(m){ delete m.content; });
-            finishSuccess(created, suffix + dedupSuffix);
-          }).catch(function(err){
-            created.forEach(function(m){ delete m.content; });
-            showToast('AI 채점에 실패해서 기본 점수로 등록했어요: ' + (err && err.message ? err.message : '오류'));
-            finishSuccess(created, dedupSuffix);
-          });
-        }).catch(function(err){ finishError(err, '네트워크 또는 키를 확인해주세요'); });
-      }
+          return;
+        }
+        var dedupSuffix = dedup.skipped > 0 ? (' (중복 ' + dedup.skipped + '개 제외' + (dedup.shortBy > 0 ? ', 더 찾지 못해 ' + dedup.shortBy + '개 부족' : '') + ')') : '';
+        if (!aiScore){
+          created.forEach(function(m){ delete m.content; });
+          finishSuccess(created, dedupSuffix);
+          return;
+        }
+        state.home.statusMsg = 'AI가 ' + created.length + '개 자료의 점수를 판단하고 있어요...';
+        render();
+        estimateScoresBatch(created, aiEngine).then(function(scoresList){
+          var suffix = applyAiScores(created, scoresList);
+          created.forEach(function(m){ delete m.content; });
+          finishSuccess(created, suffix + dedupSuffix);
+        }).catch(function(err){
+          created.forEach(function(m){ delete m.content; });
+          showToast('AI 채점에 실패해서 기본 점수로 등록했어요: ' + (err && err.message ? err.message : '오류'));
+          finishSuccess(created, dedupSuffix);
+        });
+      }).catch(function(err){ finishError(err, '네트워크 또는 키를 확인해주세요'); });
     });
 
     // bulk add tab
@@ -1821,7 +1744,7 @@
       var field = document.getElementById('bulk-field').value;
       var text = document.getElementById('bulk-text').value;
       var aiScore = document.getElementById('bulk-ai-score') ? document.getElementById('bulk-ai-score').checked : false;
-      var aiEngine = document.getElementById('bulk-ai-engine') ? document.getElementById('bulk-ai-engine').value : 'claude';
+      var aiEngine = document.getElementById('bulk-ai-engine') ? document.getElementById('bulk-ai-engine').value : 'gemini';
       var created = parseBulkUrls(text, field);
       if (created.length === 0){ showToast('추가할 내용을 입력해주세요'); return; }
       var statusEl = document.getElementById('bulk-urls-status');
@@ -1858,35 +1781,6 @@
       showToast(count + '개 샘플 자료가 생성되었어요');
       render();
     });
-    var kwBtn = document.getElementById('kw-collect');
-    if (kwBtn) kwBtn.addEventListener('click', function(){
-      var keyword = document.getElementById('kw-input').value.trim();
-      if (!keyword){ showToast('검색 키워드를 입력해주세요'); return; }
-      var countRaw = parseInt(document.getElementById('kw-count').value, 10);
-      var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(10, countRaw));
-      var statusEl = document.getElementById('kw-status');
-      kwBtn.disabled = true; kwBtn.textContent = '검색 중...';
-      if (statusEl) statusEl.textContent = '웹에서 "' + keyword + '" 관련 자료를 찾고 있어요...';
-      collectByKeyword(keyword, count).then(function(arr){
-        var created = arr.map(function(item){
-          var field = FIELD_TREE.hasOwnProperty(item.field) ? item.field : Object.keys(FIELD_TREE)[0];
-          var scores = {};
-          CRITERIA.forEach(function(c){
-            var v = item.scores && typeof item.scores[c.key] === 'number' ? item.scores[c.key] : 60;
-            scores[c.key] = Math.max(0, Math.min(100, Math.round(v)));
-          });
-          return { id: uid(), title: item.title || keyword, field: field, subfield: null, source: item.source || '미상', url: item.url || null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
-        });
-        state.materials = state.materials.concat(created);
-        saveMaterials();
-        showToast(created.length + '개 자료를 자동으로 수집했어요');
-        render();
-      }).catch(function(err){
-        showToast('자동 수집에 실패했어요. 잠시 후 다시 시도해주세요.');
-        render();
-      });
-    });
-
     var tavilyBtn = document.getElementById('tavily-collect');
     if (tavilyBtn) tavilyBtn.addEventListener('click', function(){
       var keyword = document.getElementById('tavily-kw').value.trim();
@@ -1894,7 +1788,7 @@
       var countRaw = parseInt(document.getElementById('tavily-count').value, 10);
       var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(10, countRaw));
       var aiScore = document.getElementById('tavily-ai-score') ? document.getElementById('tavily-ai-score').checked : false;
-      var aiEngine = document.getElementById('tavily-ai-engine') ? document.getElementById('tavily-ai-engine').value : 'claude';
+      var aiEngine = document.getElementById('tavily-ai-engine') ? document.getElementById('tavily-ai-engine').value : 'gemini';
       if (!keyword){ showToast('검색 키워드를 입력해주세요'); return; }
       var statusEl = document.getElementById('tavily-status');
       tavilyBtn.disabled = true; tavilyBtn.textContent = '검색 중...';
