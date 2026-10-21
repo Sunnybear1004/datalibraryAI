@@ -126,6 +126,46 @@
   #archive-root .menu-cat-btn:hover { background: rgba(255,255,255,0.04); }
   #archive-root .menu-sub-list .menu-item { padding-left: 46px; font-size: 13px; }
 
+  /* Opinions (issue / stance collection) */
+  #archive-root .opn-card {
+    border: 1px solid var(--line-dark); border-radius: 4px; padding: 14px 16px; margin-bottom: 10px;
+    background: transparent; width: 100%; text-align: left; display: block; color: var(--cream);
+  }
+  #archive-root .opn-card:hover { border-color: var(--gold-soft); }
+  #archive-root .opn-card h4 { font-family: var(--font-display); font-size: 16px; margin: 0 0 4px; }
+  #archive-root .opn-card .opn-card-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--cream-soft); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 8px; }
+  #archive-root .opn-mini-bar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,0.08); }
+  #archive-root .opn-mini-bar span { height: 100%; }
+  #archive-root .opn-back {
+    display: inline-flex; align-items: center; gap: 6px; background: transparent; border: none;
+    color: var(--cream-soft); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.04em; padding: 0; margin-bottom: 14px;
+  }
+  #archive-root .opn-back:hover { color: var(--gold); }
+  #archive-root .opn-issue-title { font-family: var(--font-display); font-size: 22px; margin: 0 0 4px; }
+  #archive-root .opn-issue-context { font-size: 12.5px; color: var(--cream-soft); margin: 0 0 20px; line-height: 1.6; }
+  #archive-root .opn-badge {
+    font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.04em;
+    padding: 2px 7px; border-radius: 10px; border: 1px solid var(--line-dark); color: var(--cream-soft);
+    margin-left: 8px; white-space: nowrap;
+  }
+  #archive-root .opn-item {
+    border: 1px solid var(--line-dark); border-radius: 4px; padding: 11px 14px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; gap: 10px; align-items: flex-start;
+  }
+  #archive-root .opn-item-body { flex: 1; min-width: 0; }
+  #archive-root .opn-text { font-size: 13px; line-height: 1.55; margin: 0 0 4px; }
+  #archive-root .opn-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--cream-soft); display: flex; align-items: center; flex-wrap: wrap; }
+  #archive-root .opn-meta a { color: var(--gold); text-decoration: none; margin-left: 8px; }
+  #archive-root .opn-del-btn { background: transparent; border: none; color: var(--cream-soft); padding: 2px 4px; flex-shrink: 0; }
+  #archive-root .opn-del-btn:hover { color: var(--reject); }
+  #archive-root .opn-group { margin-bottom: 22px; }
+  #archive-root .opn-group-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  #archive-root .opn-group-label { font-family: var(--font-display); font-size: 15.5px; }
+  #archive-root .opn-group-pct { font-family: var(--font-mono); font-size: 12px; color: var(--gold); }
+  #archive-root .opn-bar-bg { height: 9px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; margin-bottom: 10px; }
+  #archive-root .opn-bar { height: 100%; }
+
   /* Card */
   #archive-root .deck { position: relative; height: 480px; margin-bottom: 18px; }
   #archive-root .card {
@@ -589,6 +629,7 @@
       bias: state.bias,
       trained: state.trained,
       geminiSettings: state.geminiSettings,
+      issues: state.issues,
       updatedAt: Date.now()
     };
     currentSavePromise = appDataDocRef(uidAtCallTime).set(payload)
@@ -653,7 +694,15 @@
     rejFilter: 'all',
     acctEmailMsg: null, acctEmailLoading: false,
     acctPwMsg: null, acctPwLoading: false,
-    acctDeleteMsg: null, acctDeleteLoading: false
+    acctDeleteMsg: null, acctDeleteLoading: false,
+    issues: [],
+    opinionsView: {
+      mode: 'list', activeIssueId: null,
+      newTitle: '', newContext: '',
+      collectTopic: '', collectCount: 6, collectLoading: false, collectMsg: null,
+      manualText: '', manualSource: '', manualUrl: '',
+      clusterLoading: false, clusterMsg: null
+    }
   };
 
   function zeroWeights(){
@@ -669,6 +718,7 @@
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
       state.geminiSettings = { model: 'gemini-2.5-flash' };
+      state.issues = [];
       state.loaded = true;
       render();
       persistAppData(); // background save, no need to make the user wait
@@ -684,10 +734,12 @@
       state.bias = typeof data.bias === 'number' ? data.bias : 0;
       state.trained = data.trained || 0;
       state.geminiSettings = data.geminiSettings || { model: 'gemini-2.5-flash' };
+      state.issues = data.issues || [];
     } catch(e){
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
       state.geminiSettings = { model: 'gemini-2.5-flash' };
+      state.issues = [];
       persistAppData();
     }
 
@@ -698,6 +750,7 @@
   async function saveMaterials(){ return persistAppData(); }
   async function saveModel(){ return persistAppData(); }
   async function saveGeminiSettings(){ return persistAppData(); }
+  async function saveIssues(){ return persistAppData(); }
 
   function sigmoid(z){ return 1/(1+Math.exp(-z)); }
 
@@ -1155,12 +1208,235 @@
     return html;
   }
 
-  // ---- Opinions tab (placeholder — feature not built yet) ----
+  // ---- Opinions tab: collect subjective takes on an issue and cluster them by stance ----
+  var OPN_COLORS = ['#C89B3C','#5C7F5B','#B5573F','#6B8CA6','#9B6FA6','#A68A4A','#4F8F8A','#A65C6B'];
+  function opinionColorForIndex(i){ return OPN_COLORS[i % OPN_COLORS.length]; }
+
+  function findIssue(id){
+    return state.issues.filter(function(x){ return x.id === id; })[0] || null;
+  }
+
   function opinionsTabHtml(){
-    return '<div class="empty" style="height:auto;padding:40px 20px;">' +
-      '<h3>의견 수집 (준비 중)</h3>' +
-      '<p>사회 이슈나 정책에 대해 전문가·여러 사람들의 주관적인 의견을 모으고, 입장이 비슷한 것끼리 자동으로 묶어 비율로 시각화하는 기능을 이 탭에 곧 추가할 예정이에요.</p>' +
+    var ov = state.opinionsView;
+    if (ov.mode === 'detail'){
+      var issue = findIssue(ov.activeIssueId);
+      if (!issue){ ov.mode = 'list'; ov.activeIssueId = null; return opinionsListHtml(); }
+      return opinionsDetailHtml(issue);
+    }
+    return opinionsListHtml();
+  }
+
+  function opinionsListHtml(){
+    var html = '<p class="section-title">의견 수집</p>' +
+      '<p style="font-size:12.5px;color:var(--cream-soft);margin:-10px 0 20px;line-height:1.6;">사회 이슈나 정책을 하나 등록하면, 그에 대한 여러 사람·전문가의 의견을 AI로 자동 수집하거나 직접 입력해서 모을 수 있어요. 어느 정도 모이면 AI가 비슷한 입장끼리 자동으로 묶어서 비율로 보여줘요.</p>';
+
+    html += '<div class="acct-block">' +
+      '<div class="acct-label">새 이슈 등록</div>' +
+      '<div class="field"><label>이슈 제목</label><input type="text" id="opn-new-title" placeholder="예: 주 4일제 도입, 최저임금 인상" value="' + escapeHtml(state.opinionsView.newTitle||'') + '" /></div>' +
+      '<div class="field"><label>배경 설명 (선택)</label><textarea id="opn-new-context" rows="2" placeholder="이 이슈에 대해 알아두면 좋은 맥락을 짧게 적어주세요">' + escapeHtml(state.opinionsView.newContext||'') + '</textarea></div>' +
+      '<button class="btn" id="opn-create-issue">이슈 만들기</button>' +
       '</div>';
+
+    if (state.issues.length === 0){
+      html += '<div class="empty" style="height:auto;padding:30px 20px;"><h3>아직 등록된 이슈가 없어요</h3><p>위에서 이슈를 하나 만들면 의견을 모으기 시작할 수 있어요.</p></div>';
+      return html;
+    }
+
+    html += '<p class="section-title">등록된 이슈 (' + state.issues.length + '개)</p>';
+    state.issues.slice().sort(function(a,b){ return b.createdAt - a.createdAt; }).forEach(function(issue){
+      var total = issue.opinions.length;
+      var groups = issue.groups || [];
+      var miniBar = '';
+      if (groups.length && total){
+        miniBar = '<div class="opn-mini-bar">' + groups.map(function(g, i){
+          var pct = Math.round((g.opinionIds.length/total)*1000)/10;
+          return '<span style="width:' + pct + '%;background:' + opinionColorForIndex(i) + ';"></span>';
+        }).join('') + '</div>';
+      }
+      html += '<button type="button" class="opn-card" data-opn-issue="' + issue.id + '">' +
+        '<h4>' + escapeHtml(issue.title) + '</h4>' +
+        '<div class="opn-card-meta">의견 ' + total + '개' + (groups.length ? ' · 입장 ' + groups.length + '개로 분류됨' : ' · 아직 분류 안 됨') + '</div>' +
+        miniBar +
+      '</button>';
+    });
+    return html;
+  }
+
+  function opinionsDetailHtml(issue){
+    var ov = state.opinionsView;
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+      '<button type="button" class="opn-back" id="opn-back">← 이슈 목록으로</button>' +
+      '<button type="button" class="btn ghost small" data-opn-delete-issue="' + issue.id + '">이슈 삭제</button>' +
+    '</div>';
+    html += '<h2 class="opn-issue-title">' + escapeHtml(issue.title) + '</h2>';
+    if (issue.context) html += '<p class="opn-issue-context">' + escapeHtml(issue.context) + '</p>';
+
+    // --- collection controls ---
+    html += '<div class="acct-block">' +
+      '<div class="acct-label">AI로 의견 자동 수집</div>' +
+      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">아래 주제로 웹에서 찬성·반대·전문가 분석 등 다양한 시각의 글을 찾아서, AI가 각 출처의 입장을 한두 문장으로 요약해 가져와요.</p>' +
+      '<div class="field"><label>검색 주제</label><input type="text" id="opn-collect-topic" value="' + escapeHtml(ov.collectTopic || issue.title) + '" /></div>' +
+      '<div class="field" style="max-width:160px;"><label>수집 개수 (최대 12)</label><input type="text" id="opn-collect-count" value="' + (ov.collectCount||6) + '" /></div>' +
+      '<button class="btn" id="opn-collect-btn" ' + (ov.collectLoading?'disabled':'') + '>' + (ov.collectLoading ? '수집하는 중...' : 'AI로 의견 찾기') + '</button>' +
+      (ov.collectMsg ? '<p style="margin-top:10px;font-size:12px;color:var(--cream-soft);">' + escapeHtml(ov.collectMsg) + '</p>' : '') +
+      '</div>';
+
+    html += '<div class="acct-block">' +
+      '<div class="acct-label">직접 의견 추가</div>' +
+      '<div class="field"><label>의견 내용</label><textarea id="opn-manual-text" rows="3" placeholder="예: 생산성 저하 우려 없이 노동시간을 줄일 수 있다는 연구 결과가 많다">' + escapeHtml(ov.manualText||'') + '</textarea></div>' +
+      '<div class="field-row">' +
+        '<div class="field"><label>출처 / 작성자</label><input type="text" id="opn-manual-source" placeholder="예: OO 교수, OO 신문 사설" value="' + escapeHtml(ov.manualSource||'') + '" /></div>' +
+        '<div class="field"><label>원문 URL (선택)</label><input type="text" id="opn-manual-url" placeholder="https://..." value="' + escapeHtml(ov.manualUrl||'') + '" /></div>' +
+      '</div>' +
+      '<button class="btn ghost" id="opn-manual-add-btn">의견 추가하기</button>' +
+      '</div>';
+
+    // --- clustering control ---
+    if (issue.opinions.length >= 2){
+      html += '<button class="btn" id="opn-cluster-btn" style="margin-bottom:8px;" ' + (ov.clusterLoading?'disabled':'') + '>' +
+        (ov.clusterLoading ? '입장 분류하는 중...' : (issue.groups && issue.groups.length ? '다시 분류하기' : '입장별로 자동 분류하기')) +
+      '</button>';
+      if (ov.clusterMsg) html += '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 16px;">' + escapeHtml(ov.clusterMsg) + '</p>';
+    }
+
+    // --- visualization (grouped) or flat list ---
+    if (issue.groups && issue.groups.length){
+      html += '<p class="section-title">입장별 분포</p>';
+      var total = issue.opinions.length;
+      var byId = {};
+      issue.opinions.forEach(function(o){ byId[o.id] = o; });
+      issue.groups.slice().sort(function(a,b){ return b.opinionIds.length - a.opinionIds.length; }).forEach(function(g, i){
+        var pct = total ? Math.round((g.opinionIds.length/total)*1000)/10 : 0;
+        var color = opinionColorForIndex(i);
+        html += '<div class="opn-group">' +
+          '<div class="opn-group-head"><span class="opn-group-label" style="color:' + color + ';">' + escapeHtml(g.label) + '</span><span class="opn-group-pct">' + pct + '% · ' + g.opinionIds.length + '개</span></div>' +
+          '<div class="opn-bar-bg"><div class="opn-bar" style="width:' + pct + '%;background:' + color + ';"></div></div>';
+        g.opinionIds.forEach(function(oid){
+          var o = byId[oid];
+          if (!o) return;
+          html += opinionItemHtml(o);
+        });
+        html += '</div>';
+      });
+    } else if (issue.opinions.length){
+      html += '<p class="section-title">모은 의견 (' + issue.opinions.length + '개)</p>';
+      issue.opinions.slice().sort(function(a,b){ return b.createdAt-a.createdAt; }).forEach(function(o){
+        html += opinionItemHtml(o);
+      });
+    }
+
+    return html;
+  }
+
+  function opinionItemHtml(o){
+    return '<div class="opn-item">' +
+      '<div class="opn-item-body">' +
+        '<p class="opn-text">' + escapeHtml(o.text) + '</p>' +
+        '<div class="opn-meta">출처: ' + escapeHtml(o.source || '미상') +
+          (o.url ? '<a href="' + escapeHtml(o.url) + '" target="_blank" rel="noopener noreferrer">원문 →</a>' : '') +
+          '<span class="opn-badge">' + (o.via === 'ai' ? 'AI 수집' : '직접 입력') + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<button type="button" class="opn-del-btn" data-opn-del-opinion="' + o.id + '">' + ICONS.x + '</button>' +
+    '</div>';
+  }
+
+  // Judges from title/url/snippet what stance or claim each search result
+  // represents, in reported-speech ("~라고 주장한다"), plus a short source label.
+  async function extractOpinionsGemini(items, issueTitle){
+    var gs = state.geminiSettings || {};
+    var model = gs.model || 'gemini-2.5-flash';
+    var listText = items.map(function(it, i){
+      return '[' + (i+1) + '] 제목: ' + (it.title||'') + '\nURL: ' + (it.url||'') +
+        (it.content ? '\n내용: ' + it.content.slice(0,500) : '');
+    }).join('\n\n');
+    var prompt = '다음은 "' + issueTitle + '"라는 사회적 이슈/정책에 대한 웹 검색 결과 목록이야. ' +
+      '각 항목의 출처가 이 이슈에 대해 실제로 어떤 입장이나 주장을 펼치는지 한두 문장으로 요약해줘. ' +
+      '"~라고 본다", "~을 주장한다"처럼 보도체로 써줘. 출처 이름(언론사·기관·저자 등)도 짧게 뽑아줘. ' +
+      '단순 사실 나열이라 뚜렷한 입장이 없으면 핵심 내용을 그대로 요약해도 돼.\n\n' +
+      listText + '\n\n' +
+      '아래 JSON 배열로만 응답해:\n' +
+      '[{"index":1,"opinion":"요약된 의견/주장","source":"출처 이름"}]';
+    var data = await geminiFetch(prompt, model, true);
+    var clean = (data.text||'').replace(/```json/gi,'').replace(/```/g,'').trim();
+    var arr = JSON.parse(clean);
+    if (!Array.isArray(arr)) throw new Error('invalid response shape');
+    var byIndex = {};
+    arr.forEach(function(r){ if (r && r.index) byIndex[r.index] = r; });
+    return items.map(function(it, i){
+      var r = byIndex[i+1];
+      var host = null;
+      try { host = new URL(it.url).hostname.replace(/^www\./,''); } catch(e){ host = null; }
+      return {
+        id: uid(),
+        text: (r && r.opinion) ? r.opinion : (it.content ? it.content.slice(0,200) : (it.title || '')),
+        source: (r && r.source) ? r.source : (host || '출처 미상'),
+        url: it.url || null,
+        via: 'ai',
+        createdAt: Date.now()
+      };
+    });
+  }
+
+  // Fires several angled Tavily searches (찬성/반대/전문가 분석/비판 등) so the
+  // collected set actually spans different stances instead of one search's
+  // worth of similar top results, then has Gemini turn each raw result into
+  // a short opinion statement. Dedupes against the issue's existing opinion URLs.
+  async function collectDiverseOpinions(issue, topic, targetCount, onProgress){
+    var angles = ['찬성', '반대', '전문가 분석', '비판적 시각', '관련 보도'];
+    var seen = {};
+    issue.opinions.forEach(function(o){ var n = normalizeUrl(o.url); if (n) seen[n] = true; });
+    var collected = [];
+    for (var i=0; i<angles.length && collected.length < targetCount; i++){
+      if (onProgress) onProgress(angles[i], collected.length);
+      var results;
+      try {
+        results = await tavilySearch(topic + ' ' + angles[i], Math.max(2, Math.ceil(targetCount/2)));
+      } catch(e){ continue; }
+      results.forEach(function(r){
+        if (collected.length >= targetCount) return;
+        var n = normalizeUrl(r.url);
+        if (n && seen[n]) return;
+        if (n) seen[n] = true;
+        collected.push(r);
+      });
+    }
+    if (collected.length === 0) return [];
+    return extractOpinionsGemini(collected.slice(0, targetCount), issue.title);
+  }
+
+  // Groups the issue's opinions into a small number of stance clusters with
+  // AI-chosen labels. Any opinion the model doesn't place anywhere falls back
+  // into a catch-all "기타" group so percentages always add up to 100%.
+  async function clusterOpinionsGemini(issue){
+    var gs = state.geminiSettings || {};
+    var model = gs.model || 'gemini-2.5-flash';
+    var listText = issue.opinions.map(function(o, i){
+      return '[' + (i+1) + '] ' + o.text + ' (출처: ' + (o.source||'미상') + ')';
+    }).join('\n');
+    var prompt = '다음은 "' + issue.title + '" 이슈에 대해 수집된 의견 목록이야. ' +
+      '이 의견들을 입장이 비슷한 것끼리 자연스럽게 몇 개의 그룹으로 묶어줘(보통 2~5개 그룹이 적당해). ' +
+      '각 그룹에는 그 입장을 한눈에 알 수 있는 짧은 이름(5~12자 정도)을 붙이고, 그 그룹에 속하는 의견들의 번호를 모두 나열해줘. ' +
+      '모든 의견은 반드시 하나의 그룹에 속해야 하고, 그룹을 너무 잘게 쪼개지 마.\n\n' +
+      listText + '\n\n' +
+      '아래 JSON으로만 응답해:\n' +
+      '{"groups":[{"label":"그룹 이름","indexes":[1,3,5]}]}';
+    var data = await geminiFetch(prompt, model, true);
+    var clean = (data.text||'').replace(/```json/gi,'').replace(/```/g,'').trim();
+    var parsed = JSON.parse(clean);
+    if (!parsed || !Array.isArray(parsed.groups)) throw new Error('invalid response shape');
+    var groups = parsed.groups.map(function(g){
+      var opinionIds = (g.indexes||[]).map(function(idx){
+        var o = issue.opinions[idx-1];
+        return o ? o.id : null;
+      }).filter(Boolean);
+      return { id: uid(), label: g.label || '분류 안 됨', opinionIds: opinionIds };
+    }).filter(function(g){ return g.opinionIds.length > 0; });
+    var covered = {};
+    groups.forEach(function(g){ g.opinionIds.forEach(function(id){ covered[id]=true; }); });
+    var leftover = issue.opinions.filter(function(o){ return !covered[o.id]; }).map(function(o){ return o.id; });
+    if (leftover.length) groups.push({ id: uid(), label: '기타', opinionIds: leftover });
+    return groups;
   }
 
   function parseBulkUrls(text, field){
@@ -1948,6 +2224,131 @@
       });
     });
 
+    // opinions tab
+    var opnCreateBtn = document.getElementById('opn-create-issue');
+    if (opnCreateBtn) opnCreateBtn.addEventListener('click', function(){
+      var title = document.getElementById('opn-new-title').value.trim();
+      if (!title){ showToast('이슈 제목을 입력해주세요'); return; }
+      var context = document.getElementById('opn-new-context').value.trim();
+      var issue = { id: uid(), title: title, context: context || null, createdAt: Date.now(), opinions: [], groups: [] };
+      state.issues.push(issue);
+      saveIssues();
+      state.opinionsView.newTitle = ''; state.opinionsView.newContext = '';
+      state.opinionsView.mode = 'detail';
+      state.opinionsView.activeIssueId = issue.id;
+      state.opinionsView.collectTopic = title;
+      state.opinionsView.collectMsg = null;
+      state.opinionsView.clusterMsg = null;
+      render();
+    });
+    document.querySelectorAll('[data-opn-issue]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var issue = findIssue(btn.getAttribute('data-opn-issue'));
+        if (!issue) return;
+        state.opinionsView.mode = 'detail';
+        state.opinionsView.activeIssueId = issue.id;
+        state.opinionsView.collectTopic = issue.title;
+        state.opinionsView.collectMsg = null;
+        state.opinionsView.clusterMsg = null;
+        render();
+      });
+    });
+    var opnBackBtn = document.getElementById('opn-back');
+    if (opnBackBtn) opnBackBtn.addEventListener('click', function(){
+      state.opinionsView.mode = 'list';
+      state.opinionsView.activeIssueId = null;
+      render();
+    });
+    document.querySelectorAll('[data-opn-delete-issue]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        if (!confirm('이 이슈와 모아둔 의견을 전부 삭제할까요? 되돌릴 수 없어요.')) return;
+        var id = btn.getAttribute('data-opn-delete-issue');
+        state.issues = state.issues.filter(function(x){ return x.id !== id; });
+        saveIssues();
+        state.opinionsView.mode = 'list';
+        state.opinionsView.activeIssueId = null;
+        render();
+      });
+    });
+    var opnCollectBtn = document.getElementById('opn-collect-btn');
+    if (opnCollectBtn) opnCollectBtn.addEventListener('click', function(){
+      var issue = findIssue(state.opinionsView.activeIssueId);
+      if (!issue) return;
+      var topic = document.getElementById('opn-collect-topic').value.trim() || issue.title;
+      var countRaw = parseInt(document.getElementById('opn-collect-count').value, 10);
+      var count = isNaN(countRaw) ? 6 : Math.max(2, Math.min(12, countRaw));
+      state.opinionsView.collectTopic = topic;
+      state.opinionsView.collectCount = count;
+      state.opinionsView.collectLoading = true;
+      state.opinionsView.collectMsg = '"' + topic + '" 관련 의견을 웹에서 찾고 있어요...';
+      render();
+      collectDiverseOpinions(issue, topic, count, function(angle){
+        state.opinionsView.collectMsg = '"' + angle + '" 관점에서 찾는 중...';
+        render();
+      }).then(function(newOpinions){
+        state.opinionsView.collectLoading = false;
+        if (newOpinions.length === 0){
+          state.opinionsView.collectMsg = '새로 찾은 의견이 없어요 (이미 모은 출처와 중복이거나 검색 결과가 없어요)';
+        } else {
+          issue.opinions = issue.opinions.concat(newOpinions);
+          saveIssues();
+          state.opinionsView.collectMsg = newOpinions.length + '개 의견을 찾아서 추가했어요';
+        }
+        render();
+      }).catch(function(err){
+        state.opinionsView.collectLoading = false;
+        state.opinionsView.collectMsg = '수집에 실패했어요: ' + (err && err.message ? err.message : '오류');
+        render();
+      });
+    });
+    var opnManualAddBtn = document.getElementById('opn-manual-add-btn');
+    if (opnManualAddBtn) opnManualAddBtn.addEventListener('click', function(){
+      var issue = findIssue(state.opinionsView.activeIssueId);
+      if (!issue) return;
+      var text = document.getElementById('opn-manual-text').value.trim();
+      if (!text){ showToast('의견 내용을 입력해주세요'); return; }
+      var source = document.getElementById('opn-manual-source').value.trim() || '미상';
+      var url = document.getElementById('opn-manual-url').value.trim() || null;
+      issue.opinions.push({ id: uid(), text: text, source: source, url: url, via: 'manual', createdAt: Date.now() });
+      saveIssues();
+      showToast('의견이 추가되었어요');
+      render();
+    });
+    document.querySelectorAll('[data-opn-del-opinion]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var issue = findIssue(state.opinionsView.activeIssueId);
+        if (!issue) return;
+        var oid = btn.getAttribute('data-opn-del-opinion');
+        issue.opinions = issue.opinions.filter(function(o){ return o.id !== oid; });
+        if (issue.groups && issue.groups.length){
+          issue.groups = issue.groups.map(function(g){
+            return { id: g.id, label: g.label, opinionIds: g.opinionIds.filter(function(id){ return id !== oid; }) };
+          }).filter(function(g){ return g.opinionIds.length > 0; });
+        }
+        saveIssues();
+        render();
+      });
+    });
+    var opnClusterBtn = document.getElementById('opn-cluster-btn');
+    if (opnClusterBtn) opnClusterBtn.addEventListener('click', function(){
+      var issue = findIssue(state.opinionsView.activeIssueId);
+      if (!issue) return;
+      state.opinionsView.clusterLoading = true;
+      state.opinionsView.clusterMsg = 'AI가 의견들을 보고 비슷한 입장끼리 묶는 중...';
+      render();
+      clusterOpinionsGemini(issue).then(function(groups){
+        issue.groups = groups;
+        saveIssues();
+        state.opinionsView.clusterLoading = false;
+        state.opinionsView.clusterMsg = groups.length + '개의 입장으로 분류했어요';
+        render();
+      }).catch(function(err){
+        state.opinionsView.clusterLoading = false;
+        state.opinionsView.clusterMsg = '분류에 실패했어요: ' + (err && err.message ? err.message : '오류');
+        render();
+      });
+    });
+
     // rejected tab
     document.querySelectorAll('[data-restore]').forEach(function(btn){
       btn.addEventListener('click', function(){
@@ -2008,7 +2409,9 @@
       if (!confirm('모든 자료와 학습 데이터를 초기화할까요? 이 작업은 되돌릴 수 없습니다.')) return;
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
-      saveMaterials(); saveModel();
+      state.issues = [];
+      state.opinionsView.mode = 'list'; state.opinionsView.activeIssueId = null;
+      saveMaterials(); saveModel(); saveIssues();
       state.tab = 'swipe';
       render();
     });
