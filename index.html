@@ -367,20 +367,32 @@
 
   function uid(){ return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-  // Inside claude.ai artifacts, api.anthropic.com works with no key at all.
-  // Outside (e.g. GitHub Pages), a personal key + this header is required for
-  // Anthropic to accept a request made directly from a browser.
-  function claudeApiHeaders(){
-    var key = state.claudeSettings && state.claudeSettings.apiKey;
-    if (key){
-      return {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      };
-    }
-    return { 'Content-Type': 'application/json' };
+  // Every AI/search call (Claude, Gemini, Tavily) goes through a small
+  // Cloudflare Worker so the real API keys stay on the server and never
+  // reach the browser. The worker checks the caller's Firebase ID token
+  // against Google before doing anything, so only signed-in users of THIS
+  // app can use it.
+  //
+  // IMPORTANT: replace this with your own deployed Worker's URL after
+  // running `npx wrangler deploy` in the cf-proxy folder (see its README).
+  var PROXY_BASE_URL = 'https://archive-desk-proxy.sunbear1004.workers.dev';
+
+  function callFn(name, data){
+    if (!state.user || !fbAuth.currentUser) return Promise.reject(new Error('로그인이 필요해요'));
+    return fbAuth.currentUser.getIdToken().then(function(idToken){
+      return fetch(PROXY_BASE_URL + '/' + name, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+        body: JSON.stringify(data || {})
+      });
+    }).then(function(res){
+      return res.json().catch(function(){ return {}; }).then(function(body){
+        if (!res.ok){
+          throw new Error((body && body.error) ? body.error : ('프록시 서버 요청이 실패했어요 (' + res.status + ')'));
+        }
+        return body;
+      });
+    });
   }
 
   // ---------- Firebase (auth + per-user Firestore storage) ----------
@@ -462,8 +474,6 @@
       weights: state.weights,
       bias: state.bias,
       trained: state.trained,
-      tavilySettings: state.tavilySettings,
-      claudeSettings: state.claudeSettings,
       geminiSettings: state.geminiSettings,
       updatedAt: Date.now()
     };
@@ -516,11 +526,7 @@
     compare: { mode:'free', field:'all', a:null, b:null, critAnswers:{}, overall:null },
     bulk: { mode: 'urls' },
     home: { engine: 'claude', field: '', keyword: '', count: 5, loading: false, statusMsg: null, lastAdded: [] },
-    tavilySettings: { apiKey: '' },
-    tavilyMsg: null,
-    claudeSettings: { apiKey: '' },
-    claudeMsg: null,
-    geminiSettings: { apiKey: '', model: 'gemini-2.5-flash' },
+    geminiSettings: { model: 'gemini-2.5-flash' },
     geminiMsg: null,
     geminiModelList: null,
     geminiModelListLoading: false,
@@ -546,9 +552,7 @@
       // round-trip (and its failure/catch delay) entirely and start from seed data.
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
-      state.tavilySettings = { apiKey: '' };
-      state.claudeSettings = { apiKey: '' };
-      state.geminiSettings = { apiKey: '', model: 'gemini-2.5-flash' };
+      state.geminiSettings = { model: 'gemini-2.5-flash' };
       state.loaded = true;
       render();
       persistAppData(); // background save, no need to make the user wait
@@ -563,15 +567,11 @@
       state.weights = data.weights || zeroWeights();
       state.bias = typeof data.bias === 'number' ? data.bias : 0;
       state.trained = data.trained || 0;
-      state.tavilySettings = data.tavilySettings || { apiKey: '' };
-      state.claudeSettings = data.claudeSettings || { apiKey: '' };
-      state.geminiSettings = data.geminiSettings || { apiKey: '', model: 'gemini-2.5-flash' };
+      state.geminiSettings = data.geminiSettings || { model: 'gemini-2.5-flash' };
     } catch(e){
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
-      state.tavilySettings = { apiKey: '' };
-      state.claudeSettings = { apiKey: '' };
-      state.geminiSettings = { apiKey: '', model: 'gemini-2.5-flash' };
+      state.geminiSettings = { model: 'gemini-2.5-flash' };
       persistAppData();
     }
 
@@ -581,8 +581,6 @@
 
   async function saveMaterials(){ return persistAppData(); }
   async function saveModel(){ return persistAppData(); }
-  async function saveTavilySettings(){ return persistAppData(); }
-  async function saveClaudeSettings(){ return persistAppData(); }
   async function saveGeminiSettings(){ return persistAppData(); }
 
   function sigmoid(z){ return 1/(1+Math.exp(-z)); }
@@ -829,7 +827,6 @@
   }
 
   function summaryBlockHtml(material){
-    var hasGeminiKey = !!(state.geminiSettings && state.geminiSettings.apiKey);
     var isLoading = state.summaryLoading && state.summaryTargetId === material.id;
     var errMsg = (!isLoading && state.summaryTargetId === material.id) ? state.summaryError : null;
 
@@ -844,7 +841,7 @@
     } else if (isLoading){
       html += '<div class="ai-summary-status">AI가 요약을 만들고 있어요...</div>';
     } else {
-      html += '<button type="button" class="btn ghost small' + (hasGeminiKey?'':' locked') + '" id="summary-generate" data-material-id="' + material.id + '" data-nodrag="1" ' + (hasGeminiKey?'':'title="설정 탭에서 Gemini 키를 먼저 등록하세요"') + '>AI 요약 보기' + (hasGeminiKey?'':' 🔒') + '</button>';
+      html += '<button type="button" class="btn ghost small" id="summary-generate" data-material-id="' + material.id + '" data-nodrag="1">AI 요약 보기</button>';
       if (errMsg) html += '<p class="ai-summary-error">' + escapeHtml(errMsg) + '</p>';
     }
     html += '</div>';
@@ -870,8 +867,6 @@
 
   function homeTabHtml(approved, rejected, pending){
     var h = state.home;
-    var hasTavilyKey = !!(state.tavilySettings && state.tavilySettings.apiKey);
-    if (h.engine === 'tavily' && !hasTavilyKey) h.engine = 'claude';
     var fieldOptions = '<option value="" ' + (h.field ? '' : 'selected') + '>자동 (학습된 선호 분야 사용)</option>' +
       Object.keys(FIELD_TREE).map(function(f){ return '<option value="'+f+'" '+(h.field===f?'selected':'')+'>'+f+'</option>'; }).join('');
     var hasProfile = state.trained > 0 && approved.length > 0;
@@ -906,16 +901,15 @@
 
     html += '<div class="compare-controls"><div class="mode-toggle">' +
       '<button data-homeengine="claude" class="' + (h.engine==='claude'?'active':'') + '">Claude로 찾기</button>' +
-      '<button data-homeengine="tavily" class="' + (h.engine==='tavily'?'active':'') + (hasTavilyKey?'':' locked') + '" ' + (hasTavilyKey?'':'title="설정 탭에서 Tavily 키를 먼저 등록하세요"') + '>Tavily로 찾기' + (hasTavilyKey?'':' 🔒') + '</button>' +
+      '<button data-homeengine="tavily" class="' + (h.engine==='tavily'?'active':'') + '">Tavily로 찾기</button>' +
     '</div></div>';
 
     html += '<div class="field" style="max-width:200px;"><label>수집 개수 (최대 10)</label><input type="text" id="home-count" value="' + h.count + '" /></div>';
     if (h.engine === 'tavily'){
-      var defaultAiEngine1 = (state.geminiSettings && state.geminiSettings.apiKey) ? 'gemini' : 'claude';
       html += '<div class="toggle-row"><input type="checkbox" id="home-ai-score" checked /><label for="home-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기</label></div>' +
         '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="home-ai-engine">' +
-          '<option value="gemini" ' + (defaultAiEngine1==='gemini'?'selected':'') + '>Gemini</option>' +
-          '<option value="claude" ' + (defaultAiEngine1==='claude'?'selected':'') + '>Claude</option>' +
+          '<option value="gemini" selected>Gemini</option>' +
+          '<option value="claude">Claude</option>' +
         '</select></div>';
     }
     html += '<button class="btn" id="home-collect" ' + (h.loading?'disabled':'') + '>' + (h.loading ? '찾는 중...' : '내 성향에 맞는 자료 찾기') + '</button>';
@@ -965,7 +959,6 @@
     var sliders = CRITERIA.map(function(c){
       return '<div class="slider-row"><label>' + c.label + '</label><input type="range" min="0" max="100" value="60" data-slider="' + c.key + '"/><span class="val" data-val="' + c.key + '">60</span></div>';
     }).join('');
-    var defaultEngine = (state.geminiSettings && state.geminiSettings.apiKey) ? 'gemini' : 'claude';
     return '' +
       '<p class="section-title">새 자료 등록</p>' +
       '<div class="field"><label>제목</label><input type="text" id="f-title" placeholder="예: OO 현상에 대한 최신 연구 결과" /></div>' +
@@ -984,10 +977,10 @@
       '<div id="slider-wrap" style="display:none;" class="slider-grid">' + sliders + '</div>' +
       '<div id="ai-score-wrap" style="display:none;">' +
         '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="f-score-engine">' +
-          '<option value="gemini" ' + (defaultEngine==='gemini'?'selected':'') + '>Gemini</option>' +
-          '<option value="claude" ' + (defaultEngine==='claude'?'selected':'') + '>Claude</option>' +
+          '<option value="gemini" selected>Gemini</option>' +
+          '<option value="claude">Claude</option>' +
         '</select></div>' +
-        '<p id="ai-score-note" style="font-size:12px;color:var(--cream-soft);margin:-8px 0 16px;">제목·출처·URL을 바탕으로 AI가 8개 요소 점수를 추정해요. Gemini는 설정 탭에 키 등록이 꼭 필요하고, Claude는 claude.ai 안에서는 키 없이도 동작해요.</p>' +
+        '<p id="ai-score-note" style="font-size:12px;color:var(--cream-soft);margin:-8px 0 16px;">제목·출처·URL을 바탕으로 AI가 8개 요소 점수를 추정해요.</p>' +
       '</div>' +
       '<button class="btn" id="btn-add-material">자료 추가하기</button>' +
       '<div id="add-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
@@ -996,8 +989,6 @@
   // ---- Bulk add tab ----
   function bulkTabHtml(){
     var b = state.bulk;
-    var hasTavilyKey = !!(state.tavilySettings && state.tavilySettings.apiKey);
-    if (b.mode === 'tavily' && !hasTavilyKey) b.mode = 'urls';
     var fieldOptions = Object.keys(FIELD_TREE).map(function(f){ return '<option value="'+f+'">'+f+'</option>'; }).join('');
     var html = '<p class="section-title">자료 대량 추가</p>' +
       '<p class="bulk-note">이 앱은 브라우저에서만 동작하기 때문에 웹사이트를 자동으로 크롤링해서 내용을 가져올 수는 없어요. 대신 URL 목록을 한 번에 붙여넣어 여러 자료를 빠르게 등록하거나, 테스트용 샘플 자료를 자동 생성할 수 있습니다. 이렇게 등록된 자료는 카드 평가에서 똑같이 스와이프하며 평가할 수 있어요.</p>' +
@@ -1005,10 +996,9 @@
         '<button data-bulkmode="urls" class="' + (b.mode==='urls'?'active':'') + '">URL 목록으로 추가</button>' +
         '<button data-bulkmode="generate" class="' + (b.mode==='generate'?'active':'') + '">샘플 자동 생성</button>' +
         '<button data-bulkmode="keyword" class="' + (b.mode==='keyword'?'active':'') + '">키워드 자동 수집 (Claude)</button>' +
-        '<button data-bulkmode="tavily" class="' + (b.mode==='tavily'?'active':'') + (hasTavilyKey?'':' locked') + '" ' + (hasTavilyKey?'':'title="설정 탭에서 Tavily 키를 먼저 등록하세요"') + '>키워드 자동 수집 (Tavily)' + (hasTavilyKey?'':' 🔒') + '</button>' +
+        '<button data-bulkmode="tavily" class="' + (b.mode==='tavily'?'active':'') + '">키워드 자동 수집 (Tavily)</button>' +
       '</div></div>';
 
-    var defaultAiEngine = (state.geminiSettings && state.geminiSettings.apiKey) ? 'gemini' : 'claude';
     if (b.mode === 'urls'){
       html += '<div class="field"><label>적용할 분야 (전체 목록 동일 적용)</label><select id="bulk-field">' + fieldOptions + '</select></div>' +
         '<div class="field"><label>자료 목록 — 한 줄에 하나씩</label>' +
@@ -1018,8 +1008,8 @@
         String.fromCharCode(10) + '제목만 입력해도 됩니다 (출처·URL 없이 등록)"></textarea></div>' +
         '<div class="toggle-row"><input type="checkbox" id="bulk-ai-score" checked /><label for="bulk-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기</label></div>' +
         '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="bulk-ai-engine">' +
-          '<option value="gemini" ' + (defaultAiEngine==='gemini'?'selected':'') + '>Gemini</option>' +
-          '<option value="claude" ' + (defaultAiEngine==='claude'?'selected':'') + '>Claude</option>' +
+          '<option value="gemini" selected>Gemini</option>' +
+          '<option value="claude">Claude</option>' +
         '</select></div>' +
         '<button class="btn" id="bulk-add-urls">목록 추가하기</button>' +
         '<div id="bulk-urls-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
@@ -1037,25 +1027,17 @@
         '<button class="btn" id="kw-collect">자동 수집하기</button>' +
         '<div id="kw-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
     } else {
-      var ts = state.tavilySettings || { apiKey: '' };
-      html += '<p class="bulk-note" style="border-color:var(--gold-soft);">Tavily는 AI 앱을 위해 만들어진 검색 API로, 깔끔한 JSON 결과(제목·URL·요약)를 돌려줍니다. 이 앱의 네트워크 환경에 따라 요청이 막힐 수도 있어, 먼저 한 번 테스트해보시는 걸 권장해요.</p>';
-      if (!ts.apiKey){
-        html += '<div class="empty" style="height:auto;padding:24px 20px;">' +
-          '<h3>Tavily API 키가 설정되어 있지 않아요</h3>' +
-          '<p>설정 탭에서 한 번만 등록해두면 여기서 매번 다시 입력하지 않아도 돼요.</p>' +
-          '<button class="btn" data-goto="settings">설정으로 이동</button></div>';
-      } else {
-        html += '<div class="field"><label>적용할 분야</label><select id="tavily-field">' + fieldOptions + '</select></div>' +
-          '<div class="field"><label>검색 키워드</label><input type="text" id="tavily-kw" placeholder="예: 양자컴퓨팅 상용화" /></div>' +
-          '<div class="field"><label>수집 개수 (최대 10)</label><input type="text" id="tavily-count" value="5" /></div>' +
-          '<div class="toggle-row"><input type="checkbox" id="tavily-ai-score" checked /><label for="tavily-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기</label></div>' +
-          '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="tavily-ai-engine">' +
-            '<option value="gemini" ' + (defaultAiEngine==='gemini'?'selected':'') + '>Gemini</option>' +
-            '<option value="claude" ' + (defaultAiEngine==='claude'?'selected':'') + '>Claude</option>' +
-          '</select></div>' +
-          '<button class="btn" id="tavily-collect">Tavily로 검색하기</button>' +
-          '<div id="tavily-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
-      }
+      html += '<p class="bulk-note" style="border-color:var(--gold-soft);">Tavily는 AI 앱을 위해 만들어진 검색 API로, 깔끔한 JSON 결과(제목·URL·요약)를 돌려줍니다.</p>' +
+        '<div class="field"><label>적용할 분야</label><select id="tavily-field">' + fieldOptions + '</select></div>' +
+        '<div class="field"><label>검색 키워드</label><input type="text" id="tavily-kw" placeholder="예: 양자컴퓨팅 상용화" /></div>' +
+        '<div class="field"><label>수집 개수 (최대 10)</label><input type="text" id="tavily-count" value="5" /></div>' +
+        '<div class="toggle-row"><input type="checkbox" id="tavily-ai-score" checked /><label for="tavily-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기</label></div>' +
+        '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="tavily-ai-engine">' +
+          '<option value="gemini" selected>Gemini</option>' +
+          '<option value="claude">Claude</option>' +
+        '</select></div>' +
+        '<button class="btn" id="tavily-collect">Tavily로 검색하기</button>' +
+        '<div id="tavily-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
     }
     return html;
   }
@@ -1111,18 +1093,8 @@
       '"scores":{"trust":0-100,"appropriateness":0-100,"recency":0-100,"objectivity":0-100,"expertise":0-100,"clarity":0-100,"lowBias":0-100,"interest":0-100}}]\n' +
       'scores는 검색된 내용을 바탕으로 합리적으로 추정한 값이어야 하고, url은 검색으로 실제 확인된 링크만 사용해.';
 
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: claudeApiHeaders(),
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }],
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }]
-      })
-    });
-    var data = await response.json();
-    var text = (data.content || []).map(function(bl){ return bl.type === 'text' ? bl.text : ''; }).join('\n');
+    var data = await callFn('claudeGenerate', { prompt: prompt, maxTokens: 2000 });
+    var text = data.text || '';
     var clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     var arr = JSON.parse(clean);
     if (!Array.isArray(arr)) throw new Error('invalid response shape');
@@ -1157,14 +1129,8 @@
     return { kept: kept, skipped: skipped };
   }
 
-  async function tavilySearch(apiKey, query, count){
-    var response = await fetch('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: apiKey, query: query, max_results: count })
-    });
-    var data = await response.json();
-    if (data.error) throw new Error(typeof data.error === 'string' ? data.error : 'Tavily API error');
+  async function tavilySearch(query, count){
+    var data = await callFn('tavilySearch', { query: query, maxResults: count });
     if (!data.results) throw new Error('예상치 못한 응답 형식이에요');
     return data.results;
   }
@@ -1173,7 +1139,7 @@
   // genuinely-new (not-already-imported) items, since Tavily has no
   // pagination/offset — the only lever is requesting more results per call.
   // Gives up after a few tries so a thin topic can't loop forever.
-  async function tavilyCollectWithBackfill(apiKey, query, targetCount, onProgress){
+  async function tavilyCollectWithBackfill(query, targetCount, onProgress){
     var seen = existingUrlSet();
     var collected = [];
     var totalSkipped = 0;
@@ -1185,7 +1151,7 @@
     while (collected.length < targetCount && attempts < maxAttempts){
       attempts++;
       if (onProgress) onProgress(attempts, collected.length);
-      var items = await tavilySearch(apiKey, query, requestSize);
+      var items = await tavilySearch(query, requestSize);
       var res = dedupeAgainstSeen(items, seen);
       totalSkipped += res.skipped;
       var needed = targetCount - collected.length;
@@ -1257,18 +1223,8 @@
       '"scores":{"trust":0-100,"appropriateness":0-100,"recency":0-100,"objectivity":0-100,"expertise":0-100,"clarity":0-100,"lowBias":0-100,"interest":0-100}}]\n' +
       'scores는 검색된 내용을 바탕으로 합리적으로 추정한 값이어야 하고, url은 검색으로 실제 확인된 링크만 사용해.';
 
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: claudeApiHeaders(),
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2200,
-        messages: [{ role: 'user', content: prompt }],
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }]
-      })
-    });
-    var data = await response.json();
-    var text = (data.content || []).map(function(bl){ return bl.type === 'text' ? bl.text : ''; }).join('\n');
+    var data = await callFn('claudeGenerate', { prompt: prompt, maxTokens: 2200 });
+    var text = data.text || '';
     var clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     var arr = JSON.parse(clean);
     if (!Array.isArray(arr)) throw new Error('invalid response shape');
@@ -1306,19 +1262,8 @@
       '아래 JSON 배열로만 응답해. 설명, 마크다운, 코드펜스 없이 순수 JSON만 출력해.\n' +
       '[{"index":1,"scores":{"trust":0-100,"appropriateness":0-100,"recency":0-100,"objectivity":0-100,"expertise":0-100,"clarity":0-100,"lowBias":0-100,"interest":0-100}}]';
 
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: claudeApiHeaders(),
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2200,
-        messages: [{ role: 'user', content: prompt }],
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }]
-      })
-    });
-    var data = await response.json();
-    if (data.error) throw new Error(data.error.message || 'Claude API 오류');
-    var text = (data.content || []).map(function(bl){ return bl.type === 'text' ? bl.text : ''; }).join('\n');
+    var data = await callFn('claudeGenerate', { prompt: prompt, maxTokens: 2200 });
+    var text = data.text || '';
     var clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     var arr = JSON.parse(clean);
     if (!Array.isArray(arr)) throw new Error('invalid response shape');
@@ -1343,40 +1288,19 @@
   // person pull the real list for their own key and pick one that works.
   // Fires one minimal generateContent call to confirm the key+model combo
   // actually works, surfacing a 404 (wrong model) vs other errors clearly.
-  async function testGeminiConnection(apiKey, model){
-    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: 'ping' }] }] })
-    });
-    var data = null;
-    try { data = await response.json(); } catch(e){}
-    if (!response.ok){
-      var msg = (data && data.error && data.error.message) ? data.error.message : (response.status + ' ' + response.statusText);
-      var err = new Error(msg);
-      err.status = response.status;
-      throw err;
-    }
+  async function testGeminiConnection(model){
+    await callFn('geminiGenerate', { prompt: 'ping', model: model });
     return true;
   }
 
-  async function listGeminiModels(apiKey){
-    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(apiKey), {
-      method: 'GET'
-    });
-    var data = await response.json();
-    if (data.error) throw new Error(data.error.message || 'Gemini API 오류');
-    if (!data.models) throw new Error('모델 목록을 받지 못했어요');
-    return data.models
-      .filter(function(m){ return (m.supportedGenerationMethods || []).indexOf('generateContent') !== -1; })
-      .map(function(m){ return { name: (m.name || '').replace(/^models\//, ''), displayName: m.displayName || m.name }; });
+  async function listGeminiModels(){
+    var data = await callFn('geminiListModels', {});
+    return data.models || [];
   }
 
   async function estimateScoresBatchGemini(items){
     var gs = state.geminiSettings || {};
-    var apiKey = gs.apiKey;
     var model = gs.model || 'gemini-2.5-flash';
-    if (!apiKey) throw new Error('설정 탭에서 Gemini API 키를 먼저 등록해주세요');
 
     var listText = items.map(function(it, i){
       return '[' + (i+1) + '] 제목: ' + it.title +
@@ -1392,24 +1316,8 @@
       '아래 JSON 배열로만 응답해:\n' +
       '[{"index":1,"scores":{"trust":0-100,"appropriateness":0-100,"recency":0-100,"objectivity":0-100,"expertise":0-100,"clarity":0-100,"lowBias":0-100,"interest":0-100}}]';
 
-    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json' }
-      })
-    });
-    var data = await response.json();
-    if (data.error) throw new Error(data.error.message || 'Gemini API 오류');
-    var text;
-    try {
-      text = data.candidates[0].content.parts.map(function(p){ return p.text || ''; }).join('\n');
-    } catch(e){
-      throw new Error('예상치 못한 Gemini 응답 형식이에요');
-    }
+    var data = await callFn('geminiGenerate', { prompt: prompt, model: model, jsonMode: true });
+    var text = data.text || '';
     var clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     var arr = JSON.parse(clean);
     if (!Array.isArray(arr)) throw new Error('invalid response shape');
@@ -1434,7 +1342,7 @@
   // Card-level summary. No live browsing available, so this is explicitly
   // framed to the model (and to the person, in the UI) as an estimate from
   // title/source/field alone, not a read of the actual page content.
-  async function generateSummaryGemini(apiKey, model, material){
+  async function generateSummaryGemini(model, material){
     var prompt = '다음 자료가 어떤 내용을 다룰지 2~3문장으로 짧게 요약해줘. ' +
       '실제 본문을 읽은 게 아니라 제목·출처·분야만 보고 추정하는 것이므로, 단정적으로 말하지 말고 "~일 것으로 보인다", "~에 관한 내용으로 추정된다" 같은 어조를 써줘.\n\n' +
       '제목: ' + material.title + '\n' +
@@ -1443,19 +1351,8 @@
       (material.url ? 'URL: ' + material.url + '\n' : '') +
       '\n요약 텍스트만 출력해. 따옴표나 다른 설명 없이.';
 
-    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-    });
-    var data = await response.json();
-    if (data.error) throw new Error(data.error.message || 'Gemini API 오류');
-    var text;
-    try {
-      text = data.candidates[0].content.parts.map(function(p){ return p.text || ''; }).join('\n').trim();
-    } catch(e){
-      throw new Error('예상치 못한 Gemini 응답 형식이에요');
-    }
+    var data = await callFn('geminiGenerate', { prompt: prompt, model: model });
+    var text = (data.text || '').trim();
     if (!text) throw new Error('빈 응답을 받았어요');
     return text;
   }
@@ -1604,40 +1501,19 @@
   }
 
   function settingsTabHtml(){
-    var html = '<p class="section-title">API 연동</p>';
-    var ts = state.tavilySettings || { apiKey: '' };
-    var hasKey = !!ts.apiKey;
-    html += '<div class="acct-block"><div class="acct-label">Tavily 검색 키</div>' +
-      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">여기에 한 번 저장해두면, "대량 추가"와 "메인화면"의 Tavily 자동 수집에서 매번 다시 입력하지 않아도 돼요. 현재 상태: <b style="color:' + (hasKey?'var(--approve)':'var(--reject)') + ';">' + (hasKey ? '설정됨' : '미설정') + '</b></p>' +
-      '<div class="field"><label>Tavily API 키</label><input type="password" id="settings-tavily-key" placeholder="tvly-..." value="' + escapeHtml(ts.apiKey||'') + '" /></div>' +
-      (state.tavilyMsg ? '<p class="acct-msg ' + state.tavilyMsg.type + '">' + escapeHtml(state.tavilyMsg.text) + '</p>' : '') +
-      '<div style="display:flex;gap:8px;">' +
-        '<button class="btn ghost small" id="tavily-save">저장하기</button>' +
-        (hasKey ? '<button class="btn ghost small" id="tavily-clear" style="border-color:var(--reject);color:var(--reject);">키 삭제</button>' : '') +
-      '</div></div>';
+    var html = '<p class="section-title">AI 연동</p>';
+    html += '<div class="acct-block"><div class="acct-label">검색·채점 엔진</div>' +
+      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">Claude · Gemini · Tavily API 키는 별도 프록시 서버에 안전하게 저장되어 있어서, 이 계정으로 로그인한 사람은 별도 키 등록 없이 바로 "키워드 자동 수집", "AI 자동 채점", "AI 요약"을 쓸 수 있어요.</p></div>';
 
-    var cs = state.claudeSettings || { apiKey: '' };
-    var hasClaudeKey = !!cs.apiKey;
-    html += '<div class="acct-block"><div class="acct-label">Claude API 키</div>' +
-      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">claude.ai 안에서는 키 없이도 "키워드 자동 수집 (Claude)"와 "AI 자동 채점"이 바로 동작해요. 이 키는 GitHub Pages 등 밖으로 배포한 뒤에도 그 기능들을 계속 쓰고 싶을 때만 필요합니다 (console.anthropic.com에서 발급). 현재 상태: <b style="color:' + (hasClaudeKey?'var(--approve)':'var(--reject)') + ';">' + (hasClaudeKey ? '설정됨' : '미설정 (claude.ai 안에서는 이대로도 동작해요)') + '</b></p>' +
-      '<div class="field"><label>Claude API 키</label><input type="password" id="settings-claude-key" placeholder="sk-ant-..." value="' + escapeHtml(cs.apiKey||'') + '" /></div>' +
-      (state.claudeMsg ? '<p class="acct-msg ' + state.claudeMsg.type + '">' + escapeHtml(state.claudeMsg.text) + '</p>' : '') +
-      '<div style="display:flex;gap:8px;">' +
-        '<button class="btn ghost small" id="claude-save">저장하기</button>' +
-        (hasClaudeKey ? '<button class="btn ghost small" id="claude-clear" style="border-color:var(--reject);color:var(--reject);">키 삭제</button>' : '') +
-      '</div></div>';
-
-    var gs = state.geminiSettings || { apiKey: '', model: 'gemini-2.5-flash' };
-    var hasGeminiKey = !!gs.apiKey;
-    html += '<div class="acct-block"><div class="acct-label">Gemini API 키</div>' +
-      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">"AI 자동 채점"에서 Gemini를 채점 엔진으로 쓰려면 여기에 키가 필요해요 (Google AI Studio, aistudio.google.com 에서 무료 발급). Claude와 달리 어디서든(claude.ai 안이든 배포된 사이트든) 이 키가 있어야 동작합니다. 현재 상태: <b style="color:' + (hasGeminiKey?'var(--approve)':'var(--reject)') + ';">' + (hasGeminiKey ? '설정됨' : '미설정') + '</b></p>' +
-      '<div class="field"><label>Gemini API 키</label><input type="password" id="settings-gemini-key" placeholder="AIza..." value="' + escapeHtml(gs.apiKey||'') + '" /></div>' +
+    var gs = state.geminiSettings || { model: 'gemini-2.5-flash' };
+    html += '<div class="acct-block"><div class="acct-label">Gemini 모델 선택</div>' +
+      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">AI 채점·AI 요약에서 Gemini 엔진을 고르면 이 모델이 사용됩니다. 서버에 등록된 키로 실제 사용 가능한 모델 목록을 불러올 수 있어요.</p>' +
       '<div class="field"><label>모델명</label><input type="text" id="settings-gemini-model" placeholder="gemini-2.5-flash" value="' + escapeHtml(gs.model||'gemini-2.5-flash') + '" /></div>' +
-      '<button class="btn ghost small" id="gemini-list-models" style="margin-bottom:12px;" ' + (state.geminiModelListLoading?'disabled':'') + '>' + (state.geminiModelListLoading ? '불러오는 중...' : '내 키로 실제 사용 가능한 모델 확인') + '</button>';
+      '<button class="btn ghost small" id="gemini-list-models" style="margin-bottom:12px;" ' + (state.geminiModelListLoading?'disabled':'') + '>' + (state.geminiModelListLoading ? '불러오는 중...' : '사용 가능한 모델 확인') + '</button>';
 
     if (state.geminiModelList){
       if (state.geminiModelList.length === 0){
-        html += '<p style="font-size:12px;color:var(--reject);margin:-6px 0 12px;">이 키로 사용 가능한 생성 모델이 없어요. 키가 올바른지, Google AI Studio에서 발급한 키가 맞는지 확인해주세요.</p>';
+        html += '<p style="font-size:12px;color:var(--reject);margin:-6px 0 12px;">서버에 등록된 키로 사용 가능한 생성 모델이 없어요. 관리자에게 문의해주세요.</p>';
       } else {
         html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;font-family:var(--font-mono);color:var(--cream-soft);margin-bottom:6px;">사용 가능한 모델 (' + state.geminiModelList.length + '개) — 클릭해서 선택</div>' +
           '<div class="model-list">' +
@@ -1654,8 +1530,7 @@
     }
     html += (state.geminiMsg ? '<p class="acct-msg ' + state.geminiMsg.type + '">' + escapeHtml(state.geminiMsg.text) + '</p>' : '') +
       '<div style="display:flex;gap:8px;">' +
-        '<button class="btn ghost small" id="gemini-save" ' + (state.geminiTestLoading?'disabled':'') + '>' + (state.geminiTestLoading ? '연결 확인 중...' : '저장하기') + '</button>' +
-        (hasGeminiKey ? '<button class="btn ghost small" id="gemini-clear" style="border-color:var(--reject);color:var(--reject);">키 삭제</button>' : '') +
+        '<button class="btn ghost small" id="gemini-save" ' + (state.geminiTestLoading?'disabled':'') + '>' + (state.geminiTestLoading ? '연결 확인 중...' : '모델 저장하기') + '</button>' +
       '</div></div>';
 
     html += '<p class="section-title">데이터 관리</p><button class="btn ghost small" id="reset-all">모든 데이터 초기화</button>';
@@ -1745,13 +1620,6 @@
 
     var summaryBtn = document.getElementById('summary-generate');
     if (summaryBtn) summaryBtn.addEventListener('click', function(){
-      var hasGeminiKey = !!(state.geminiSettings && state.geminiSettings.apiKey);
-      if (!hasGeminiKey){
-        showToast('Gemini 키를 먼저 설정해주세요');
-        state.tab = 'settings';
-        render();
-        return;
-      }
       var matId = summaryBtn.getAttribute('data-material-id');
       var mat = pending.filter(function(m){ return m.id === matId; })[0];
       if (!mat) return;
@@ -1760,7 +1628,7 @@
       state.summaryError = null;
       render();
       var gs = state.geminiSettings;
-      generateSummaryGemini(gs.apiKey, gs.model || 'gemini-2.5-flash', mat).then(function(text){
+      generateSummaryGemini(gs.model || 'gemini-2.5-flash', mat).then(function(text){
         mat.summary = text;
         saveMaterials();
         state.summaryLoading = false;
@@ -1850,14 +1718,7 @@
     // home tab
     document.querySelectorAll('[data-homeengine]').forEach(function(btn){
       btn.addEventListener('click', function(){
-        var engine = btn.getAttribute('data-homeengine');
-        if (engine === 'tavily' && !(state.tavilySettings && state.tavilySettings.apiKey)){
-          showToast('Tavily 키를 먼저 설정해주세요');
-          state.tab = 'settings';
-          render();
-          return;
-        }
-        state.home.engine = engine; render();
+        state.home.engine = btn.getAttribute('data-homeengine'); render();
       });
     });
     var homeFieldEl = document.getElementById('home-field');
@@ -1909,12 +1770,10 @@
           finishSuccess(created);
         }).catch(function(err){ finishError(err); });
       } else {
-        var apiKey = state.tavilySettings && state.tavilySettings.apiKey;
         var aiScore = document.getElementById('home-ai-score') ? document.getElementById('home-ai-score').checked : false;
         var aiEngine = document.getElementById('home-ai-engine') ? document.getElementById('home-ai-engine').value : 'claude';
-        if (!apiKey){ state.home.loading = false; state.home.statusMsg = '설정 탭에서 Tavily API 키를 먼저 등록해주세요'; render(); return; }
         var query = buildTavilyQuery(brief, keyword);
-        tavilyCollectWithBackfill(apiKey, query, count, function(attempt){
+        tavilyCollectWithBackfill(query, count, function(attempt){
           if (attempt > 1) state.home.statusMsg = '중복 제외하고 ' + count + '개를 채우기 위해 더 찾는 중... (' + attempt + '차 시도)';
         }).then(function(dedup){
           var created = dedup.items.map(function(it){
@@ -1954,14 +1813,7 @@
     // bulk add tab
     document.querySelectorAll('[data-bulkmode]').forEach(function(btn){
       btn.addEventListener('click', function(){
-        var mode = btn.getAttribute('data-bulkmode');
-        if (mode === 'tavily' && !(state.tavilySettings && state.tavilySettings.apiKey)){
-          showToast('Tavily 키를 먼저 설정해주세요');
-          state.tab = 'settings';
-          render();
-          return;
-        }
-        state.bulk.mode = mode; render();
+        state.bulk.mode = btn.getAttribute('data-bulkmode'); render();
       });
     });
     var bulkAddBtn = document.getElementById('bulk-add-urls');
@@ -2037,19 +1889,17 @@
 
     var tavilyBtn = document.getElementById('tavily-collect');
     if (tavilyBtn) tavilyBtn.addEventListener('click', function(){
-      var apiKey = state.tavilySettings && state.tavilySettings.apiKey;
       var keyword = document.getElementById('tavily-kw').value.trim();
       var field = document.getElementById('tavily-field').value;
       var countRaw = parseInt(document.getElementById('tavily-count').value, 10);
       var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(10, countRaw));
       var aiScore = document.getElementById('tavily-ai-score') ? document.getElementById('tavily-ai-score').checked : false;
       var aiEngine = document.getElementById('tavily-ai-engine') ? document.getElementById('tavily-ai-engine').value : 'claude';
-      if (!apiKey){ showToast('설정 탭에서 Tavily API 키를 먼저 등록해주세요'); return; }
       if (!keyword){ showToast('검색 키워드를 입력해주세요'); return; }
       var statusEl = document.getElementById('tavily-status');
       tavilyBtn.disabled = true; tavilyBtn.textContent = '검색 중...';
       if (statusEl) statusEl.textContent = 'Tavily에서 "' + keyword + '" 관련 자료를 찾고 있어요...';
-      tavilyCollectWithBackfill(apiKey, keyword, count, function(attempt){
+      tavilyCollectWithBackfill(keyword, count, function(attempt){
         if (attempt > 1 && statusEl) statusEl.textContent = '중복 제외하고 ' + count + '개를 채우기 위해 더 찾는 중... (' + attempt + '차 시도)';
       }).then(function(dedup){
         var created = dedup.items.map(function(it){
@@ -2154,51 +2004,13 @@
       render();
     });
 
-    // settings: Tavily key
-    var tavilySaveBtn = document.getElementById('tavily-save');
-    if (tavilySaveBtn) tavilySaveBtn.addEventListener('click', function(){
-      var key = document.getElementById('settings-tavily-key').value.trim();
-      if (!key){ state.tavilyMsg = { type:'err', text:'API 키를 입력해주세요' }; render(); return; }
-      state.tavilySettings = { apiKey: key };
-      saveTavilySettings();
-      state.tavilyMsg = { type:'ok', text:'저장했어요. 이제 대량 추가·메인화면에서 바로 쓸 수 있어요.' };
-      render();
-    });
-    var tavilyClearBtn = document.getElementById('tavily-clear');
-    if (tavilyClearBtn) tavilyClearBtn.addEventListener('click', function(){
-      state.tavilySettings = { apiKey: '' };
-      saveTavilySettings();
-      state.tavilyMsg = { type:'ok', text:'키를 삭제했어요.' };
-      render();
-    });
-
-    // settings: Claude key
-    var claudeSaveBtn = document.getElementById('claude-save');
-    if (claudeSaveBtn) claudeSaveBtn.addEventListener('click', function(){
-      var key = document.getElementById('settings-claude-key').value.trim();
-      if (!key){ state.claudeMsg = { type:'err', text:'API 키를 입력해주세요' }; render(); return; }
-      state.claudeSettings = { apiKey: key };
-      saveClaudeSettings();
-      state.claudeMsg = { type:'ok', text:'저장했어요. 이제 배포된 사이트에서도 Claude 기반 기능이 동작해요.' };
-      render();
-    });
-    var claudeClearBtn = document.getElementById('claude-clear');
-    if (claudeClearBtn) claudeClearBtn.addEventListener('click', function(){
-      state.claudeSettings = { apiKey: '' };
-      saveClaudeSettings();
-      state.claudeMsg = { type:'ok', text:'키를 삭제했어요. claude.ai 안에서는 계속 키 없이 동작해요.' };
-      render();
-    });
-
-    // settings: Gemini key
+    // settings: Gemini model
     var geminiListBtn = document.getElementById('gemini-list-models');
     if (geminiListBtn) geminiListBtn.addEventListener('click', function(){
-      var key = document.getElementById('settings-gemini-key').value.trim();
-      if (!key){ state.geminiMsg = { type:'err', text:'먼저 API 키를 입력해주세요' }; render(); return; }
       state.geminiModelListLoading = true;
       state.geminiMsg = null;
       render();
-      listGeminiModels(key).then(function(models){
+      listGeminiModels().then(function(models){
         state.geminiModelListLoading = false;
         state.geminiModelList = models;
         state.geminiMsg = { type:'ok', text: models.length + '개 모델을 찾았어요. 아래에서 골라주세요.' };
@@ -2229,10 +2041,8 @@
     });
     var geminiSaveBtn = document.getElementById('gemini-save');
     if (geminiSaveBtn) geminiSaveBtn.addEventListener('click', function(){
-      var key = document.getElementById('settings-gemini-key').value.trim();
       var model = document.getElementById('settings-gemini-model').value.trim() || 'gemini-2.5-flash';
-      if (!key){ state.geminiMsg = { type:'err', text:'API 키를 입력해주세요' }; render(); return; }
-      state.geminiSettings = { apiKey: key, model: model };
+      state.geminiSettings = { model: model };
       saveGeminiSettings();
       state.geminiTestLoading = true;
       state.geminiModelListLoading = true;
@@ -2240,8 +2050,8 @@
       render();
 
       Promise.allSettled([
-        testGeminiConnection(key, model),
-        listGeminiModels(key)
+        testGeminiConnection(model),
+        listGeminiModels()
       ]).then(function(results){
         state.geminiTestLoading = false;
         state.geminiModelListLoading = false;
@@ -2265,15 +2075,6 @@
         render();
       });
     });
-    var geminiClearBtn = document.getElementById('gemini-clear');
-    if (geminiClearBtn) geminiClearBtn.addEventListener('click', function(){
-      state.geminiSettings = { apiKey: '', model: state.geminiSettings.model || 'gemini-2.5-flash' };
-      saveGeminiSettings();
-      state.geminiMsg = { type:'ok', text:'키를 삭제했어요.' };
-      state.geminiModelList = null;
-      render();
-    });
-
     // account management
     function reauthenticate(currentPassword){
       var cred = firebase.auth.EmailAuthProvider.credential(state.user.email, currentPassword);
