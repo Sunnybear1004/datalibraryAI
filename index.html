@@ -630,8 +630,12 @@
       trained: state.trained,
       geminiSettings: state.geminiSettings,
       issues: state.issues,
+      sharing: state.sharing,
+      importedProfiles: state.importedProfiles,
       updatedAt: Date.now()
     };
+    // keep the published share snapshot in step with what was just saved
+    publishSharedProfile().catch(function(){});
     currentSavePromise = appDataDocRef(uidAtCallTime).set(payload)
       .catch(function(e){ showToast('저장에 실패했어요. 네트워크 연결을 확인해주세요.'); })
       .then(function(){
@@ -681,7 +685,10 @@
     pendingReject: null,
     toast: null,
     compare: { mode:'free', field:'all', a:null, b:null, critAnswers:{}, overall:null },
-    bulk: { mode: 'urls' },
+    bulk: { mode: 'urls', sel: { source: 'self', sharedCache: {}, field: '', keyword: '', count: 10, strict: 'normal', loading: false, statusMsg: null, lastAdded: [], lastFits: {} } },
+    sharing: { code: null, nickname: '', includeTitles: true },
+    importedProfiles: [],
+    shareUi: { loading: false, msg: null, importLoading: false, importMsg: null },
     home: { engine: 'tavily', field: '', keyword: '', count: 5, loading: false, statusMsg: null, lastAdded: [] },
     geminiSettings: { model: 'gemini-2.5-flash' },
     geminiMsg: null,
@@ -719,6 +726,8 @@
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
       state.geminiSettings = { model: 'gemini-2.5-flash' };
       state.issues = [];
+      state.sharing = { code: null, nickname: '', includeTitles: true };
+      state.importedProfiles = [];
       state.loaded = true;
       render();
       persistAppData(); // background save, no need to make the user wait
@@ -735,11 +744,15 @@
       state.trained = data.trained || 0;
       state.geminiSettings = data.geminiSettings || { model: 'gemini-2.5-flash' };
       state.issues = data.issues || [];
+      state.sharing = data.sharing || { code: null, nickname: '', includeTitles: true };
+      state.importedProfiles = data.importedProfiles || [];
     } catch(e){
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
       state.geminiSettings = { model: 'gemini-2.5-flash' };
       state.issues = [];
+      state.sharing = { code: null, nickname: '', includeTitles: true };
+      state.importedProfiles = [];
       persistAppData();
     }
 
@@ -1170,7 +1183,8 @@
       '<div class="compare-controls"><div class="mode-toggle">' +
         '<button data-bulkmode="urls" class="' + (b.mode==='urls'?'active':'') + '">URL 목록으로 추가</button>' +
         '<button data-bulkmode="generate" class="' + (b.mode==='generate'?'active':'') + '">샘플 자동 생성</button>' +
-        '<button data-bulkmode="tavily" class="' + (b.mode==='tavily'?'active':'') + '">키워드 자동 수집 (Tavily)</button>' +
+        '<button data-bulkmode="tavily" class="' + (b.mode==='tavily'?'active':'') + '">무분별 수집</button>' +
+        '<button data-bulkmode="selective" class="' + (b.mode==='selective'?'active':'') + '">분별 수집</button>' +
       '</div></div>';
 
     if (b.mode === 'urls'){
@@ -1193,8 +1207,10 @@
         '</div>' +
         '<p style="font-size:12px;color:var(--cream-soft);margin-bottom:14px;">평가 요소 점수가 무작위로 채워진 샘플 자료를 생성합니다. 카드 평가·상대 비교 기능을 테스트하거나 학습 데이터를 빠르게 늘리고 싶을 때 사용하세요.</p>' +
         '<button class="btn" id="bulk-generate">샘플 자동 생성하기</button>';
+    } else if (b.mode === 'selective') {
+      html += selectiveCollectHtml(fieldOptions);
     } else {
-      html += '<p class="bulk-note" style="border-color:var(--gold-soft);">Tavily는 AI 앱을 위해 만들어진 검색 API로, 깔끔한 JSON 결과(제목·URL·요약)를 돌려줍니다.</p>' +
+      html += '<p class="bulk-note" style="border-color:var(--gold-soft);"><b>무분별 수집</b> — 분야와 키워드에 맞는 검색 결과를 걸러내지 않고 그대로 가져옵니다. (Tavily 검색 사용) 내 성향에 맞는 것만 골라 담고 싶다면 "분별 수집"을 쓰세요.</p>' +
         '<div class="field"><label>적용할 분야</label><select id="tavily-field">' + fieldOptions + '</select></div>' +
         '<div class="field"><label>검색 키워드</label><input type="text" id="tavily-kw" placeholder="예: 양자컴퓨팅 상용화" /></div>' +
         '<div class="field"><label>수집 개수 (최대 10)</label><input type="text" id="tavily-count" value="5" /></div>' +
@@ -1205,6 +1221,343 @@
         '<button class="btn" id="tavily-collect">Tavily로 검색하기</button>' +
         '<div id="tavily-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
     }
+    return html;
+  }
+
+  // ---- 분별 수집: collect only what fits the signed-in user's learned profile ----
+  var STRICT_LEVELS = {
+    loose:  { label: '느슨하게',  hint: '조금이라도 관심 가질 만하면 통과시켜요.' },
+    normal: { label: '보통',      hint: '프로필과 대체로 맞으면 통과시키고, 명백히 안 맞는 것만 걸러요.' },
+    strict: { label: '엄격하게',  hint: '프로필과 확실히 맞고 반려 이유에 해당하지 않는 것만 통과시켜요.' }
+  };
+
+  // ---- profile objects: same shape whether it's my own or a shared one ----
+  // All 8 criteria ranked by the learned weight (no cutoff). The weights are
+  // small in absolute terms early on, so what matters is their relative order.
+  function profileWeightRanking(weights){
+    weights = weights || {};
+    return CRITERIA.map(function(c){ return { key: c.key, label: c.label, w: weights[c.key] || 0 }; })
+      .sort(function(a, b){ return b.w - a.w; });
+  }
+  function fmtWeight(w){ return (w >= 0 ? '+' : '') + w.toFixed(2); }
+
+  // Reject reasons with counts, biggest first (same data as the 성향 분석 tab).
+  function rejectReasonStats(){
+    var counts = {}, total = 0;
+    state.materials.forEach(function(m){
+      if (m.status === 'rejected' && m.rejectReason){ counts[m.rejectReason] = (counts[m.rejectReason]||0) + 1; total++; }
+    });
+    var list = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; })
+      .map(function(k){ return { reason: k, count: counts[k] }; });
+    return { list: list, total: total };
+  }
+
+  function ownProfile(){
+    var approved = state.materials.filter(function(m){ return m.status==='approved'; });
+    var rejected = state.materials.filter(function(m){ return m.status==='rejected'; });
+    var brief = buildProfileBrief(approved, '');
+    return {
+      source: 'self', label: '내 성향', field: brief.field,
+      weights: state.weights, bias: state.bias, trained: state.trained,
+      rejStats: rejectReasonStats(),
+      sampleTitles: brief.sampleTitles,
+      rejectExamples: rejected.slice(-5).map(function(m){ return '"' + m.title + '" (' + (m.rejectReason || '기타') + ')'; }),
+      hasData: state.trained > 0 && approved.length > 0
+    };
+  }
+
+  function profileFromShared(doc, label){
+    var list = (doc.rejectStats || []).map(function(r){ return { reason: r.reason, count: r.count || 0 }; });
+    var total = list.reduce(function(a, r){ return a + r.count; }, 0);
+    return {
+      source: 'shared', label: label || '공유받은 성향', field: doc.field || null,
+      weights: doc.weights || {}, bias: typeof doc.bias === 'number' ? doc.bias : 0, trained: doc.trained || 0,
+      rejStats: { list: list, total: total },
+      sampleTitles: doc.sampleTitles || [], rejectExamples: doc.rejectExamples || [],
+      hasData: (doc.trained || 0) > 0
+    };
+  }
+
+  function profileFit(profile, material){
+    var z = profile.bias;
+    CRITERIA.forEach(function(c){ z += (profile.weights[c.key] || 0) * ((material.scores[c.key] || 0) / 100); });
+    return sigmoid(z);
+  }
+
+  function profileSearchBrief(profile, fieldOverride){
+    return {
+      field: fieldOverride || profile.field,
+      criteria: profileWeightRanking(profile.weights).filter(function(c){ return c.w > 0.02; }).slice(0, 3),
+      sampleTitles: profile.sampleTitles || []
+    };
+  }
+
+  // Which profile 분별 수집 should use right now: my own, or a shared one
+  // (shared ones are fetched on demand and cached in state.bulk.sel.sharedCache).
+  function selectedProfileInfo(){
+    var s = state.bulk.sel;
+    if (!s.source || s.source === 'self') return { profile: ownProfile() };
+    var cached = s.sharedCache[s.source];
+    if (!cached) return { pending: true };
+    if (cached.error) return { error: cached.error };
+    var imp = state.importedProfiles.filter(function(p){ return p.code === s.source; })[0];
+    return { profile: profileFromShared(cached.doc, imp ? imp.label : (cached.doc.nickname || '')) };
+  }
+
+  function selectiveCollectHtml(){
+    var s = state.bulk.sel;
+    var ui = state.shareUi;
+    var html = '<p class="bulk-note" style="border-color:var(--gold-soft);"><b>분별 수집</b> — 선택한 성향(이 계정의 성향 또는 공유받은 성향)의 선호 분야, 기준별 가중치, 반려 이유를 기준으로 검색 결과를 AI가 하나씩 걸러서, 목표 수량만큼 채울 때까지 검색을 반복하며 담아요.</p>';
+
+    var sourceOptions = '<option value="self"' + (s.source === 'self' ? ' selected' : '') + '>내 성향 (이 계정)</option>' +
+      state.importedProfiles.map(function(p){
+        return '<option value="' + p.code + '"' + (s.source === p.code ? ' selected' : '') + '>공유받음 · ' + escapeHtml(p.label) + ' (' + p.code.slice(0, 4) + '…)</option>';
+      }).join('');
+    html += '<div class="acct-block"><div class="acct-label">어떤 성향으로 걸러낼까요</div>' +
+      '<div class="field"><label>성향 기준</label><select id="sel-source">' + sourceOptions + '</select></div>' +
+      (s.source !== 'self' ? '<button type="button" class="btn ghost small" id="sel-remove-import" style="margin-bottom:14px;">이 공유 성향을 목록에서 지우기</button>' : '') +
+      '<div class="field"><label>공유 코드로 다른 사람의 성향 추가</label><input type="text" id="sel-import-code" placeholder="예: ABCD-EFGH-JKLM" /></div>' +
+      '<button type="button" class="btn ghost small" id="sel-import-btn" ' + (ui.importLoading ? 'disabled' : '') + '>' + (ui.importLoading ? '확인 중...' : '코드로 추가하기') + '</button>' +
+      (ui.importMsg ? '<p class="acct-msg ' + ui.importMsg.type + '" style="margin:10px 0 0;">' + escapeHtml(ui.importMsg.text) + '</p>' : '') +
+      '</div>';
+
+    var info = selectedProfileInfo();
+    if (info.pending){
+      return html + '<p style="font-size:12px;color:var(--cream-soft);">공유된 성향을 불러오는 중...</p>';
+    }
+    if (info.error){
+      return html + '<div class="empty" style="height:auto;padding:24px 20px;"><h3>성향을 불러오지 못했어요</h3><p>' + escapeHtml(info.error) + '</p></div>';
+    }
+    var profile = info.profile;
+    if (!profile.hasData){
+      if (profile.source === 'self'){
+        return html + '<div class="empty" style="height:auto;padding:24px 20px;">' +
+          '<h3>아직 학습된 성향이 없어요</h3>' +
+          '<p>분별 수집은 성향 분석을 기준으로 걸러내기 때문에, 카드 평가를 몇 개 진행해서 "적절"로 승인한 자료가 있어야 해요. 그 전에는 "무분별 수집"을 쓰거나 위에서 공유받은 성향을 고를 수 있어요.</p>' +
+          '<button class="btn" data-goto="swipe">카드 평가하러 가기</button></div>';
+      }
+      return html + '<div class="empty" style="height:auto;padding:24px 20px;"><h3>학습 데이터가 없는 성향이에요</h3><p>공유한 사람이 아직 카드 평가를 하지 않아서 걸러낼 기준이 없어요.</p></div>';
+    }
+
+    var chips = profileWeightRanking(profile.weights).map(function(c){
+      return '<span class="chip">' + c.label + '<b>' + fmtWeight(c.w) + '</b></span>';
+    }).join('');
+    var rejChips = profile.rejStats.list.length
+      ? profile.rejStats.list.map(function(r){ return '<span class="chip">' + escapeHtml(r.reason) + '<b>' + r.count + '건</b></span>'; }).join('')
+      : '<span class="no-link">반려 기록이 아직 없어요</span>';
+    var fieldOptions = '<option value="" ' + (s.field ? '' : 'selected') + '>자동 (선택한 성향의 선호 분야 사용)</option>' +
+      Object.keys(FIELD_TREE).map(function(f){ return '<option value="'+f+'" '+(s.field===f?'selected':'')+'>'+f+'</option>'; }).join('');
+    var strictOptions = Object.keys(STRICT_LEVELS).map(function(k){
+      return '<option value="'+k+'" '+(s.strict===k?'selected':'')+'>'+STRICT_LEVELS[k].label+'</option>';
+    }).join('');
+
+    html += '<div class="acct-block"><div class="acct-label">' + (profile.source === 'self' ? '필터링에 쓰일 내 프로필' : '필터링에 쓰일 공유받은 프로필 · ' + escapeHtml(profile.label)) + '</div>' +
+      '<div style="font-size:13px;margin-bottom:10px;">선호 분야 · <b style="color:var(--gold);">' + escapeHtml(profile.field || '아직 없음') + '</b> · 학습 ' + profile.trained + '회</div>' +
+      '<div style="font-size:11px;color:var(--cream-soft);margin-bottom:6px;">중요하게 여기는 기준 (가중치 높은 순)</div>' +
+      '<div class="rej-chips" style="margin-bottom:12px;">' + chips + '</div>' +
+      '<div style="font-size:11px;color:var(--cream-soft);margin-bottom:6px;">반려 이유 분포</div>' +
+      '<div class="rej-chips" style="margin-bottom:0;">' + rejChips + '</div></div>';
+
+    html += '<div class="field-row">' +
+        '<div class="field"><label>키워드 (선택)</label><input type="text" id="sel-kw" placeholder="비워두면 프로필만으로 찾아요" value="' + escapeHtml(s.keyword||'') + '" /></div>' +
+        '<div class="field"><label>분야</label><select id="sel-field">' + fieldOptions + '</select></div>' +
+      '</div>' +
+      '<div class="field-row">' +
+        '<div class="field"><label>목표 수량 (최대 30)</label><input type="text" id="sel-count" value="' + s.count + '" /></div>' +
+        '<div class="field"><label>AI 필터 엄격도</label><select id="sel-strict">' + strictOptions + '</select></div>' +
+      '</div>' +
+      '<p style="font-size:12px;color:var(--cream-soft);margin:-8px 0 16px;">' + escapeHtml((STRICT_LEVELS[s.strict] || STRICT_LEVELS.normal).hint) + ' 통과한 자료는 AI가 매긴 8개 요소 점수와 통과 이유가 함께 등록돼요.' + (profile.source === 'shared' ? ' 공유받은 성향은 수집할 때마다 공유한 사람의 최신 상태로 다시 불러와요.' : '') + '</p>' +
+      '<button class="btn" id="sel-collect" ' + (s.loading?'disabled':'') + '>' + (s.loading ? '고르는 중...' : '분별해서 수집하기') + '</button>';
+    if (s.statusMsg) html += '<p style="margin-top:10px;font-size:12px;color:var(--cream-soft);">' + escapeHtml(s.statusMsg) + '</p>';
+
+    if (s.lastAdded.length){
+      html += '<p class="section-title" style="margin-top:26px;">방금 골라 담은 자료 (' + s.lastAdded.length + '개)</p>';
+      s.lastAdded.forEach(function(m){
+        var fit = (s.lastFits && typeof s.lastFits[m.id] === 'number') ? s.lastFits[m.id] : predictFit(m);
+        html += '<div class="rec-item"><div class="t">' + escapeHtml(m.title) + '<span class="f">' + escapeHtml(m.field) + (m.matchReason ? ' · ' + escapeHtml(m.matchReason) : '') + '</span></div><div class="pct">' + Math.round(fit*100) + '%</div></div>';
+      });
+      html += '<button class="btn ghost small" style="margin-top:10px;" data-goto="swipe">카드 평가에서 확인하기</button>';
+    }
+    return html;
+  }
+
+  // One Gemini call judges a whole batch of candidates against the chosen
+  // profile: keep/drop, a one-line reason, and the 8 criterion scores.
+  async function filterCandidatesGemini(items, profile, field, strict){
+    var gs = state.geminiSettings || {};
+    var model = gs.model || 'gemini-2.5-flash';
+
+    var rejStats = profile.rejStats;
+    var ranking = profileWeightRanking(profile.weights);
+    var level = STRICT_LEVELS[strict] || STRICT_LEVELS.normal;
+
+    var profileText =
+      '- 선호 분야: ' + (field || '특별히 없음') + '\n' +
+      '- 성향 분석에서 학습된 기준별 가중치(높은 순, 값 자체는 작아도 순서와 상대적 차이가 의미 있고, 높을수록 이 사용자가 중시하는 기준이야): ' +
+        ranking.map(function(c){ return c.label + ' ' + fmtWeight(c.w); }).join(', ') + '\n' +
+      '- 반려 이유 분포: ' + (rejStats.list.length
+        ? rejStats.list.map(function(r){ return r.reason + ' ' + r.count + '건' + (rejStats.total ? '(' + Math.round(r.count / rejStats.total * 100) + '%)' : ''); }).join(', ') +
+          ' — 비중이 큰 이유에 해당하는 자료는 특히 엄격하게 걸러줘'
+        : '없음') + '\n' +
+      '- 승인했던 자료 예시: ' + (profile.sampleTitles.length ? profile.sampleTitles.map(function(t){ return '"' + t + '"'; }).join(', ') : '없음') + '\n' +
+      '- 반려했던 자료 예시: ' + (profile.rejectExamples.length ? profile.rejectExamples.join(', ') : '없음') + '\n' +
+      '- 판단 엄격도: ' + level.label + ' — ' + level.hint;
+
+    var listText = items.map(function(it, i){
+      return '[' + (i+1) + '] 제목: ' + (it.title || '') +
+        '\nURL: ' + (it.url || '없음') +
+        (it.content ? '\n요약: ' + it.content.slice(0, 400) : '');
+    }).join('\n\n');
+
+    var prompt = '너는 한 사용자의 취향을 학습한 자료 큐레이터야. 아래 사용자 프로필을 바탕으로, 후보 자료 각각이 이 사용자가 "적절"로 승인할 만한지 판단해줘.\n\n' +
+      '[사용자 프로필]\n' + profileText + '\n\n[후보 자료]\n' + listText + '\n\n' +
+      '각 후보에 대해 keep(true/false), 이유 한 줄(한국어, 30자 내외), 그리고 8개 평가 요소 점수(0~100)를 추정해줘: ' +
+      '신뢰성(trust), 적절성(appropriateness), 최신성(recency), 객관성(objectivity), 전문성(expertise), 이해하기 쉬움(clarity), 편향성 낮음(lowBias), 관심도(interest). ' +
+      '요약이 있으면 그 내용을 근거로, 없으면 제목·출처만 보고 합리적으로 추정해.\n\n' +
+      '아래 JSON 배열로만 응답해:\n' +
+      '[{"index":1,"keep":true,"reason":"이유","scores":{"trust":0-100,"appropriateness":0-100,"recency":0-100,"objectivity":0-100,"expertise":0-100,"clarity":0-100,"lowBias":0-100,"interest":0-100}}]';
+
+    var data = await geminiFetch(prompt, model, true);
+    var clean = (data.text || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+    var arr = JSON.parse(clean);
+    if (!Array.isArray(arr)) throw new Error('invalid response shape');
+    var byIndex = {};
+    arr.forEach(function(r){ if (r && r.index) byIndex[r.index] = r; });
+    return items.map(function(it, i){
+      var r = byIndex[i+1];
+      if (!r) return null;
+      var scores = {};
+      CRITERIA.forEach(function(c){
+        var v = r.scores && typeof r.scores[c.key] === 'number' ? r.scores[c.key] : 60;
+        scores[c.key] = Math.max(0, Math.min(100, Math.round(v)));
+      });
+      return { keep: r.keep === true, reason: (r.reason || '').toString().slice(0, 80), scores: scores };
+    });
+  }
+
+  // Searches in rounds (a different angle each round, since Tavily has no
+  // pagination), has the AI filter each round's fresh results, and stops once
+  // enough have passed or the angles run out. Survivors are ranked by the
+  // chosen profile's learned fit so the best matches win if more passed than needed.
+  async function selectiveCollect(profile, s, onProgress){
+    var seen = existingUrlSet();
+    var suffixes = ['', ' 분석', ' 전문가 의견', ' 최신 동향', ' 연구'];
+    var brief = profileSearchBrief(profile, s.field);
+    var baseQuery = buildTavilyQuery(brief, s.keyword);
+    var windowSize = Math.min(15, Math.max(6, s.count * 2));
+    var kept = [], scanned = 0, dropped = 0, rounds = 0, filterFailed = null;
+    var fallbackField = s.field || profile.field || Object.keys(FIELD_TREE)[0];
+
+    for (var r = 0; r < suffixes.length && kept.length < s.count; r++){
+      rounds++;
+      if (onProgress) onProgress(r + 1, kept.length, scanned);
+      var items;
+      try {
+        items = await tavilySearch(baseQuery + suffixes[r], windowSize);
+      } catch(e){
+        if (r === 0) throw e;
+        continue;
+      }
+      var fresh = dedupeAgainstSeen(items, seen).kept;
+      if (!fresh.length) continue;
+      scanned += fresh.length;
+
+      var verdicts;
+      try {
+        verdicts = await filterCandidatesGemini(fresh, profile, brief.field, s.strict);
+      } catch(e){
+        if (kept.length === 0) throw e;
+        filterFailed = e;
+        break;
+      }
+      fresh.forEach(function(it, i){
+        var v = verdicts[i];
+        if (!v || !v.keep){ dropped++; return; }
+        var host = null;
+        try { host = new URL(it.url).hostname.replace(/^www\./,''); } catch(e){ host = null; }
+        kept.push({
+          id: uid(), title: it.title || baseQuery, field: fallbackField, subfield: null,
+          source: host || '미상', url: it.url || null, matchReason: v.reason || null,
+          scores: v.scores, status: 'pending', rejectReason: null, createdAt: Date.now()
+        });
+      });
+    }
+
+    var fits = {};
+    kept.forEach(function(m){ fits[m.id] = profileFit(profile, m); });
+    kept.sort(function(a, b){ return fits[b.id] - fits[a.id]; });
+    return { materials: kept.slice(0, s.count), fits: fits, extra: Math.max(0, kept.length - s.count), scanned: scanned, dropped: dropped, rounds: rounds, filterFailed: filterFailed };
+  }
+
+  // ---- 성향 공유: publish a snapshot under a share code; others read it by code ----
+  var SHARE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function genShareCode(){
+    var buf = new Uint8Array(12);
+    crypto.getRandomValues(buf);
+    var out = '';
+    for (var i = 0; i < buf.length; i++) out += SHARE_ALPHABET.charAt(buf[i] % 32);
+    return out;
+  }
+  function fmtShareCode(c){ return c.replace(/(.{4})(?=.)/g, '$1-'); }
+  function normShareCode(raw){ return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+  function shareErrMsg(err){
+    if (err && err.code === 'permission-denied') return 'Firestore 보안 규칙에 성향 공유 설정이 아직 없어요. 안내된 규칙을 추가한 뒤 다시 시도해주세요.';
+    return (err && err.message) ? err.message : '알 수 없는 오류';
+  }
+
+  function shareSnapshot(){
+    var p = ownProfile();
+    var sh = state.sharing;
+    return {
+      ownerUid: state.user.uid,
+      nickname: sh.nickname || '',
+      includeTitles: !!sh.includeTitles,
+      updatedAt: Date.now(),
+      field: p.field || null,
+      weights: p.weights,
+      bias: p.bias,
+      trained: p.trained,
+      rejectStats: p.rejStats.list.map(function(r){ return { reason: r.reason, count: r.count }; }),
+      sampleTitles: sh.includeTitles ? p.sampleTitles.map(function(t){ return String(t).slice(0, 120); }) : [],
+      rejectExamples: sh.includeTitles ? p.rejectExamples.map(function(t){ return String(t).slice(0, 140); }) : []
+    };
+  }
+
+  function publishSharedProfile(){
+    if (!state.user || !state.sharing || !state.sharing.code) return Promise.resolve();
+    return fbDb.collection('shared_profiles').doc(state.sharing.code).set(shareSnapshot());
+  }
+
+  function fetchSharedProfile(code){
+    return fbDb.collection('shared_profiles').doc(code).get().then(function(snap){
+      if (!snap.exists) throw new Error('공유가 중단되었거나 잘못된 코드예요.');
+      return snap.data();
+    });
+  }
+
+  function shareBlockHtml(){
+    var sh = state.sharing, ui = state.shareUi;
+    var html = '<p class="section-title" style="margin-top:30px;">내 성향 공유하기</p>' +
+      '<p style="font-size:12px;color:var(--cream-soft);margin:-4px 0 14px;line-height:1.6;">공유 코드를 만들면, 그 코드를 아는 다른 사용자가 "분별 수집"에서 내 성향(기준별 가중치, 반려 이유 분포, 선호 분야)으로 자료를 걸러 모을 수 있어요. 내 이메일이나 계정 정보는 공유되지 않고, 카드 평가를 할 때마다 공유된 내용도 자동으로 최신이 돼요.</p>' +
+      '<div class="acct-block">';
+    if (!sh.code){
+      html += '<div class="field"><label>표시될 이름 (선택)</label><input type="text" id="share-nickname" placeholder="예: 민수의 성향" value="' + escapeHtml(sh.nickname || '') + '" /></div>' +
+        '<div class="toggle-row"><input type="checkbox" id="share-titles" ' + (sh.includeTitles ? 'checked' : '') + ' /><label for="share-titles" style="margin:0;">승인·반려한 자료 제목 몇 개도 예시로 함께 공유</label></div>' +
+        '<button class="btn" id="share-create" ' + (ui.loading ? 'disabled' : '') + '>' + (ui.loading ? '만드는 중...' : '공유 코드 만들기') + '</button>';
+    } else {
+      html += '<div class="acct-label">공유 중인 코드</div>' +
+        '<div style="font-family:var(--font-mono);font-size:22px;letter-spacing:0.12em;color:var(--gold);margin-bottom:12px;">' + fmtShareCode(sh.code) + '</div>' +
+        '<div style="display:flex;gap:8px;margin-bottom:16px;"><button class="btn ghost small" id="share-copy">코드 복사</button></div>' +
+        '<div class="field"><label>표시될 이름</label><input type="text" id="share-nickname" value="' + escapeHtml(sh.nickname || '') + '" /></div>' +
+        '<div class="toggle-row"><input type="checkbox" id="share-titles" ' + (sh.includeTitles ? 'checked' : '') + ' /><label for="share-titles" style="margin:0;">승인·반려한 자료 제목 몇 개도 예시로 함께 공유</label></div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<button class="btn ghost small" id="share-update" ' + (ui.loading ? 'disabled' : '') + '>설정 저장하고 지금 갱신</button>' +
+          '<button class="btn ghost small" id="share-stop" style="border-color:var(--reject);color:var(--reject);" ' + (ui.loading ? 'disabled' : '') + '>공유 중단하기</button>' +
+        '</div>';
+    }
+    if (ui.msg) html += '<p class="acct-msg ' + ui.msg.type + '" style="margin:12px 0 0;">' + escapeHtml(ui.msg.text) + '</p>';
+    html += '</div>';
     return html;
   }
 
@@ -1276,7 +1629,7 @@
       '<div class="acct-label">AI로 의견 자동 수집</div>' +
       '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">아래 주제로 웹에서 찬성·반대·전문가 분석 등 다양한 시각의 글을 찾아서, AI가 각 출처의 입장을 한두 문장으로 요약해 가져와요.</p>' +
       '<div class="field"><label>검색 주제</label><input type="text" id="opn-collect-topic" value="' + escapeHtml(ov.collectTopic || issue.title) + '" /></div>' +
-      '<div class="field" style="max-width:160px;"><label>수집 개수 (최대 12)</label><input type="text" id="opn-collect-count" value="' + (ov.collectCount||6) + '" /></div>' +
+      '<div class="field" style="max-width:160px;"><label>수집 개수 (최대 30)</label><input type="text" id="opn-collect-count" value="' + (ov.collectCount||6) + '" /></div>' +
       '<button class="btn" id="opn-collect-btn" ' + (ov.collectLoading?'disabled':'') + '>' + (ov.collectLoading ? '수집하는 중...' : 'AI로 의견 찾기') + '</button>' +
       (ov.collectMsg ? '<p style="margin-top:10px;font-size:12px;color:var(--cream-soft);">' + escapeHtml(ov.collectMsg) + '</p>' : '') +
       '</div>';
@@ -1391,7 +1744,7 @@
       if (onProgress) onProgress(angles[i], collected.length);
       var results;
       try {
-        results = await tavilySearch(topic + ' ' + angles[i], Math.max(2, Math.ceil(targetCount/2)));
+        results = await tavilySearch(topic + ' ' + angles[i], Math.min(20, Math.max(2, Math.ceil(targetCount/2))));
       } catch(e){ continue; }
       results.forEach(function(r){
         if (collected.length >= targetCount) return;
@@ -1811,6 +2164,7 @@
       });
     }
 
+    html += shareBlockHtml();
     return html;
   }
 
@@ -2224,6 +2578,196 @@
       });
     });
 
+    // bulk add tab: 분별 수집 (profile-based, AI-filtered; own or shared profile)
+    var selSourceEl = document.getElementById('sel-source');
+    if (selSourceEl) selSourceEl.addEventListener('change', function(){
+      var s = state.bulk.sel;
+      s.source = selSourceEl.value;
+      s.statusMsg = null; s.lastAdded = [];
+      if (s.source === 'self'){ render(); return; }
+      delete s.sharedCache[s.source];
+      render();
+      var code = s.source;
+      fetchSharedProfile(code).then(function(doc){
+        s.sharedCache[code] = { doc: doc };
+        render();
+      }).catch(function(err){
+        s.sharedCache[code] = { error: shareErrMsg(err) };
+        render();
+      });
+    });
+    var selRemoveBtn = document.getElementById('sel-remove-import');
+    if (selRemoveBtn) selRemoveBtn.addEventListener('click', function(){
+      var s = state.bulk.sel;
+      var code = s.source;
+      if (!code || code === 'self') return;
+      state.importedProfiles = state.importedProfiles.filter(function(p){ return p.code !== code; });
+      delete s.sharedCache[code];
+      s.source = 'self';
+      saveIssues();
+      render();
+    });
+    var selImportBtn = document.getElementById('sel-import-btn');
+    if (selImportBtn) selImportBtn.addEventListener('click', function(){
+      var ui = state.shareUi;
+      var code = normShareCode(document.getElementById('sel-import-code').value);
+      if (code.length !== 12){ ui.importMsg = { type:'err', text:'공유 코드는 12자리예요. 다시 확인해주세요.' }; render(); return; }
+      ui.importLoading = true; ui.importMsg = null; render();
+      fetchSharedProfile(code).then(function(doc){
+        ui.importLoading = false;
+        if (doc.ownerUid === state.user.uid){
+          ui.importMsg = { type:'err', text:'내가 만든 공유 코드예요. "내 성향 (이 계정)"을 고르면 돼요.' };
+          render();
+          return;
+        }
+        var label = doc.nickname || '이름 없는 성향';
+        var existing = state.importedProfiles.filter(function(p){ return p.code === code; })[0];
+        if (existing) existing.label = label;
+        else state.importedProfiles.push({ code: code, label: label, addedAt: Date.now() });
+        saveIssues();
+        state.bulk.sel.source = code;
+        state.bulk.sel.sharedCache[code] = { doc: doc };
+        state.bulk.sel.statusMsg = null; state.bulk.sel.lastAdded = [];
+        ui.importMsg = { type:'ok', text:'"' + label + '" 성향을 추가했어요. 아래에서 이 성향으로 수집할 수 있어요.' };
+        render();
+      }).catch(function(err){
+        ui.importLoading = false;
+        ui.importMsg = { type:'err', text: shareErrMsg(err) };
+        render();
+      });
+    });
+
+    var selCollectBtn = document.getElementById('sel-collect');
+    if (selCollectBtn) selCollectBtn.addEventListener('click', function(){
+      var s = state.bulk.sel;
+      var countRaw = parseInt(document.getElementById('sel-count').value, 10);
+      s.count = isNaN(countRaw) ? 10 : Math.max(1, Math.min(30, countRaw));
+      s.keyword = document.getElementById('sel-kw').value.trim();
+      s.field = document.getElementById('sel-field').value;
+      s.strict = document.getElementById('sel-strict').value;
+
+      s.loading = true; s.lastAdded = []; s.lastFits = {};
+      s.statusMsg = s.source === 'self' ? '내 프로필에 맞는 자료를 찾고 있어요...' : '공유받은 성향의 최신 상태를 불러오는 중...';
+      render();
+
+      function runWith(profile){
+        s.statusMsg = '"' + profile.label + '" 기준으로 자료를 찾고 있어요...';
+        render();
+        return selectiveCollect(profile, s, function(round, got, scanned){
+          s.statusMsg = round + '차 검색 중... (지금까지 ' + got + '/' + s.count + '개 통과, 후보 ' + scanned + '개 확인)';
+          render();
+        }).then(function(res){
+          s.loading = false;
+          if (res.materials.length === 0){
+            s.statusMsg = res.scanned === 0
+              ? '새로 찾은 자료가 없어요 (검색 결과가 없거나 모두 이미 등록된 자료예요)'
+              : '후보 ' + res.scanned + '개를 확인했지만 기준을 통과한 자료가 없어요. 엄격도를 낮추거나 키워드를 바꿔보세요.';
+            render();
+            return;
+          }
+          state.materials = state.materials.concat(res.materials);
+          saveMaterials();
+          s.lastAdded = res.materials;
+          s.lastFits = res.fits;
+          var msg = res.materials.length + '개를 골라서 카드 평가 목록에 추가했어요 (후보 ' + res.scanned + '개 중 ' + res.dropped + '개는 기준에 안 맞아 제외, ' + res.rounds + '차 검색)';
+          if (res.materials.length < s.count) msg += ' — 목표 ' + s.count + '개에는 ' + (s.count - res.materials.length) + '개 부족해요. 키워드를 바꾸거나 엄격도를 낮춰 다시 시도해보세요.';
+          if (res.filterFailed) msg += ' (AI 필터링이 중간에 실패해서 그때까지 통과한 것만 담았어요)';
+          s.statusMsg = msg;
+          render();
+        });
+      }
+
+      var start;
+      if (s.source === 'self'){
+        start = Promise.resolve(ownProfile());
+      } else {
+        var code = s.source;
+        start = fetchSharedProfile(code).then(function(doc){
+          s.sharedCache[code] = { doc: doc };
+          var imp = state.importedProfiles.filter(function(p){ return p.code === code; })[0];
+          return profileFromShared(doc, imp ? imp.label : doc.nickname);
+        });
+      }
+      start.then(function(profile){
+        if (!profile.hasData) throw new Error('이 성향은 아직 학습 데이터가 없어요.');
+        return runWith(profile);
+      }).catch(function(err){
+        s.loading = false;
+        s.statusMsg = '수집에 실패했어요: ' + shareErrMsg(err);
+        render();
+      });
+    });
+
+    // profile tab: 내 성향 공유하기
+    function readShareInputs(){
+      var nick = document.getElementById('share-nickname');
+      var titles = document.getElementById('share-titles');
+      state.sharing.nickname = nick ? nick.value.trim().slice(0, 30) : state.sharing.nickname;
+      state.sharing.includeTitles = titles ? titles.checked : state.sharing.includeTitles;
+    }
+    var shareCreateBtn = document.getElementById('share-create');
+    if (shareCreateBtn) shareCreateBtn.addEventListener('click', function(){
+      var ui = state.shareUi;
+      readShareInputs();
+      state.sharing.code = genShareCode();
+      ui.loading = true; ui.msg = null; render();
+      publishSharedProfile().then(function(){
+        ui.loading = false;
+        ui.msg = { type:'ok', text:'공유 코드를 만들었어요. 코드를 알려주면 상대가 분별 수집에서 입력할 수 있어요.' };
+        saveIssues();
+        render();
+      }).catch(function(err){
+        state.sharing.code = null;
+        ui.loading = false;
+        ui.msg = { type:'err', text:'공유를 시작하지 못했어요: ' + shareErrMsg(err) };
+        render();
+      });
+    });
+    var shareUpdateBtn = document.getElementById('share-update');
+    if (shareUpdateBtn) shareUpdateBtn.addEventListener('click', function(){
+      var ui = state.shareUi;
+      readShareInputs();
+      ui.loading = true; ui.msg = null; render();
+      publishSharedProfile().then(function(){
+        ui.loading = false;
+        ui.msg = { type:'ok', text:'공유 내용을 최신 상태로 갱신했어요.' };
+        saveIssues();
+        render();
+      }).catch(function(err){
+        ui.loading = false;
+        ui.msg = { type:'err', text:'갱신하지 못했어요: ' + shareErrMsg(err) };
+        render();
+      });
+    });
+    var shareStopBtn = document.getElementById('share-stop');
+    if (shareStopBtn) shareStopBtn.addEventListener('click', function(){
+      if (!confirm('공유를 중단할까요? 이 코드를 가진 사람은 더 이상 내 성향을 쓸 수 없어요.')) return;
+      var ui = state.shareUi;
+      var code = state.sharing.code;
+      ui.loading = true; ui.msg = null; render();
+      fbDb.collection('shared_profiles').doc(code).delete().then(function(){
+        state.sharing.code = null;
+        ui.loading = false;
+        ui.msg = { type:'ok', text:'공유를 중단했어요.' };
+        saveIssues();
+        render();
+      }).catch(function(err){
+        ui.loading = false;
+        ui.msg = { type:'err', text:'공유를 중단하지 못했어요: ' + shareErrMsg(err) };
+        render();
+      });
+    });
+    var shareCopyBtn = document.getElementById('share-copy');
+    if (shareCopyBtn) shareCopyBtn.addEventListener('click', function(){
+      var text = fmtShareCode(state.sharing.code || '');
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){ showToast('공유 코드를 복사했어요'); }, function(){ showToast('복사하지 못했어요. 코드를 직접 선택해서 복사해주세요.'); });
+      } else {
+        showToast('복사하지 못했어요. 코드를 직접 선택해서 복사해주세요.');
+      }
+    });
+
+
     // opinions tab
     var opnCreateBtn = document.getElementById('opn-create-issue');
     if (opnCreateBtn) opnCreateBtn.addEventListener('click', function(){
@@ -2276,7 +2820,7 @@
       if (!issue) return;
       var topic = document.getElementById('opn-collect-topic').value.trim() || issue.title;
       var countRaw = parseInt(document.getElementById('opn-collect-count').value, 10);
-      var count = isNaN(countRaw) ? 6 : Math.max(2, Math.min(12, countRaw));
+      var count = isNaN(countRaw) ? 6 : Math.max(2, Math.min(30, countRaw));
       state.opinionsView.collectTopic = topic;
       state.opinionsView.collectCount = count;
       state.opinionsView.collectLoading = true;
