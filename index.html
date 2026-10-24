@@ -309,6 +309,32 @@
   #archive-root .rej-item .info .tag { font-family: var(--font-mono); font-size: 12px; color: var(--reject); text-transform: uppercase; }
   #archive-root .rej-item .info .meta2 { font-size: 13px; color: var(--cream-soft); margin-top: 4px; }
 
+  /* Approved vault */
+  #archive-root .apv-controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; align-items: center; }
+  #archive-root .apv-controls .field { margin: 0; }
+  #archive-root .apv-controls input[type=text] { min-width: 220px; }
+  #archive-root .apv-count { font-family: var(--font-mono); font-size: 13px; color: var(--cream-soft); margin: -6px 0 14px; }
+  #archive-root .apv-item { border: 1px solid var(--line-dark); border-radius: 4px; padding: 16px 18px; margin-bottom: 12px; }
+  #archive-root .apv-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+  #archive-root .apv-top h4 { font-family: var(--font-display); font-size: 19px; margin: 0 0 4px; line-height: 1.4; }
+  #archive-root .apv-top .tag { font-family: var(--font-mono); font-size: 12px; color: var(--gold); text-transform: uppercase; }
+  #archive-root .apv-top .meta2 { font-size: 13px; color: var(--cream-soft); margin-top: 4px; }
+  #archive-root .apv-badges { display: flex; gap: 14px; flex-shrink: 0; text-align: center; }
+  #archive-root .apv-badge .n { font-family: var(--font-display); font-size: 24px; color: var(--gold); line-height: 1.1; }
+  #archive-root .apv-badge .l { font-family: var(--font-mono); font-size: 11.5px; color: var(--cream-soft); }
+  #archive-root .apv-bars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 14px; margin: 12px 0 4px; }
+  #archive-root .apv-bar { font-size: 12px; color: var(--cream-soft); }
+  #archive-root .apv-bar .track { height: 4px; background: var(--line-dark); border-radius: 2px; margin-top: 3px; overflow: hidden; }
+  #archive-root .apv-bar .track i { display: block; height: 100%; background: var(--sage, #6f8f6a); }
+  #archive-root .apv-note { width: 100%; box-sizing: border-box; margin-top: 12px; min-height: 44px; resize: vertical; background: transparent; color: var(--cream); border: 1px dashed var(--line-dark); border-radius: 3px; padding: 8px 10px; font: inherit; font-size: 14px; }
+  #archive-root .apv-note:focus { outline: none; border-color: var(--gold); border-style: solid; }
+  #archive-root .apv-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+  @media (max-width: 600px) {
+    #archive-root .apv-top { flex-direction: column; }
+    #archive-root .apv-bars { grid-template-columns: repeat(2, 1fr); }
+    #archive-root .apv-controls input[type=text] { min-width: 0; width: 100%; }
+  }
+
   /* Compare */
   #archive-root .compare-controls { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; flex-wrap: wrap; }
   #archive-root .mode-toggle { display: flex; border: 1px solid var(--line-dark); border-radius: 20px; overflow: hidden; }
@@ -478,6 +504,7 @@
         { id:'opinions', label:'의견 수집' }
     ]},
     { key:'vault', label:'자료함', icon: ICONS.archive, children: [
+        { id:'approved', label:'승인 자료함' },
         { id:'rejected', label:'반려 자료함' },
         { id:'compare', label:'상대 비교' },
         { id:'profile', label:'성향 분석' }
@@ -709,6 +736,7 @@
     summaryError: null,
     summaryTargetId: null,
     rejFilter: 'all',
+    apv: { q: '', field: 'all', sort: 'recent' },
     acctEmailMsg: null, acctEmailLoading: false,
     acctPwMsg: null, acctPwLoading: false,
     acctDeleteMsg: null, acctDeleteLoading: false,
@@ -824,6 +852,7 @@
   function decideSwipe(material, approve, reason){
     material.status = approve ? 'approved' : 'rejected';
     material.rejectReason = approve ? null : (reason || '기타');
+    material.decidedAt = Date.now();
     trainStep(scoreVec(material), approve ? 1 : 0);
     saveMaterials(); saveModel();
     state.pendingReject = null;
@@ -927,6 +956,7 @@
     else if (state.tab === 'add') html += addTabHtml();
     else if (state.tab === 'bulk') html += bulkTabHtml();
     else if (state.tab === 'opinions') html += opinionsTabHtml();
+    else if (state.tab === 'approved') html += approvedTabHtml(approved);
     else if (state.tab === 'rejected') html += rejectedTabHtml(rejected);
     else if (state.tab === 'compare') html += compareTabHtml(approved);
     else if (state.tab === 'profile') html += profileTabHtml(approved, rejected, pending);
@@ -2067,6 +2097,75 @@
       items;
   }
 
+  // ---- Approved vault ----
+  function avgScore(m){
+    var t = 0; CRITERIA.forEach(function(c){ t += (m.scores && m.scores[c.key]) || 0; });
+    return Math.round(t / CRITERIA.length);
+  }
+  function fmtDecided(m){
+    var t = m.decidedAt; if (!t) return '';
+    var d = new Date(t);
+    return (d.getMonth()+1) + '월 ' + d.getDate() + '일 승인';
+  }
+  function approvedTabHtml(approved){
+    if (approved.length === 0){
+      return '<div class="empty"><h3>승인 자료함이 비어있어요</h3><p>카드 평가에서 오른쪽으로 넘긴(적절) 자료가 여기 보관됩니다.</p></div>';
+    }
+    var a = state.apv;
+    var fieldsPresent = {};
+    approved.forEach(function(m){ fieldsPresent[m.field] = (fieldsPresent[m.field]||0) + 1; });
+    if (a.field !== 'all' && !fieldsPresent[a.field]) a.field = 'all';
+    var chips = Object.keys(fieldsPresent).map(function(k){ return '<span class="chip">' + escapeHtml(k) + '<b>' + fieldsPresent[k] + '</b></span>'; }).join('');
+    var fieldOptions = '<option value="all">전체 분야</option>' + Object.keys(fieldsPresent).map(function(k){ return '<option value="'+escapeHtml(k)+'" '+(a.field===k?'selected':'')+'>'+escapeHtml(k)+'</option>'; }).join('');
+    var sortOptions = [['recent','최근 승인순'],['score','평균 점수 높은순'],['fit','내 성향 일치도순'],['title','제목순']].map(function(o){ return '<option value="'+o[0]+'" '+(a.sort===o[0]?'selected':'')+'>'+o[1]+'</option>'; }).join('');
+
+    var q = a.q.trim().toLowerCase();
+    var list = approved.filter(function(m){
+      if (a.field !== 'all' && m.field !== a.field) return false;
+      if (!q) return true;
+      return ((m.title||'') + ' ' + (m.source||'') + ' ' + (m.note||'') + ' ' + fieldLabel(m)).toLowerCase().indexOf(q) !== -1;
+    });
+    var fitOf = function(m){ return predictFit(m); };
+    list = list.slice().sort(function(x, y){
+      if (a.sort === 'score') return avgScore(y) - avgScore(x);
+      if (a.sort === 'fit') return fitOf(y) - fitOf(x);
+      if (a.sort === 'title') return (x.title||'').localeCompare(y.title||'', 'ko');
+      return (y.decidedAt || y.createdAt || 0) - (x.decidedAt || x.createdAt || 0);
+    });
+
+    var items = list.map(function(m){
+      var bars = CRITERIA.map(function(c){
+        var v = (m.scores && m.scores[c.key]) || 0;
+        return '<div class="apv-bar">' + escapeHtml(c.label) + ' ' + v + '<div class="track"><i style="width:' + Math.max(0, Math.min(100, v)) + '%"></i></div></div>';
+      }).join('');
+      var decided = fmtDecided(m);
+      return '<div class="apv-item"><div class="apv-top"><div class="info">' +
+          '<h4>' + escapeHtml(m.title) + '</h4>' +
+          '<span class="tag">' + escapeHtml(fieldLabel(m)) + '</span>' +
+          '<div class="meta2">' + escapeHtml(m.source||'미상') + (decided ? ' · ' + decided : '') + '</div>' +
+          moreLinkHtml(m, 'inline-more') +
+        '</div><div class="apv-badges">' +
+          '<div class="apv-badge"><div class="n">' + avgScore(m) + '</div><div class="l">평균 점수</div></div>' +
+          '<div class="apv-badge"><div class="n">' + Math.round(fitOf(m)*100) + '%</div><div class="l">성향 일치</div></div>' +
+        '</div></div>' +
+        '<div class="apv-bars">' + bars + '</div>' +
+        '<textarea class="apv-note" data-apv-note="' + m.id + '" placeholder="이 자료에 대한 메모 (자동 저장)">' + escapeHtml(m.note || '') + '</textarea>' +
+        '<div class="apv-actions"><button class="btn ghost small" data-apv-unapprove="' + m.id + '">대기로 되돌리기</button></div>' +
+      '</div>';
+    }).join('');
+    if (!items) items = '<div class="empty" style="min-height:160px;"><p>조건에 맞는 승인 자료가 없어요.</p></div>';
+
+    return '<p class="section-title">승인 자료함</p>' +
+      '<div class="rej-chips">' + chips + '</div>' +
+      '<div class="apv-controls">' +
+        '<div class="field"><input type="text" id="apv-q" placeholder="제목·출처·메모 검색" value="' + escapeHtml(a.q) + '"></div>' +
+        '<div class="field"><select id="apv-field">' + fieldOptions + '</select></div>' +
+        '<div class="field"><select id="apv-sort">' + sortOptions + '</select></div>' +
+      '</div>' +
+      '<div class="apv-count">' + list.length + '개 표시 (전체 ' + approved.length + '개)</div>' +
+      items;
+  }
+
   // ---- Compare tab ----
   function pickPair(pool){
     if (pool.length < 2) return null;
@@ -2913,6 +3012,40 @@
     });
     var rejFilterEl = document.getElementById('rej-filter');
     if (rejFilterEl) rejFilterEl.addEventListener('change', function(){ state.rejFilter = rejFilterEl.value; render(); });
+
+    // approved tab
+    var apvQ = document.getElementById('apv-q');
+    if (apvQ){
+      var apvComposing = false;
+      var apvApply = function(){
+        state.apv.q = apvQ.value;
+        var pos = apvQ.selectionStart;
+        render();
+        var el = document.getElementById('apv-q');
+        if (el){ el.focus(); try { el.setSelectionRange(pos, pos); } catch(e){} }
+      };
+      apvQ.addEventListener('compositionstart', function(){ apvComposing = true; });
+      apvQ.addEventListener('compositionend', function(){ apvComposing = false; apvApply(); });
+      apvQ.addEventListener('input', function(e){ if (apvComposing || e.isComposing) return; apvApply(); });
+    }
+    var apvField = document.getElementById('apv-field');
+    if (apvField) apvField.addEventListener('change', function(){ state.apv.field = apvField.value; render(); });
+    var apvSort = document.getElementById('apv-sort');
+    if (apvSort) apvSort.addEventListener('change', function(){ state.apv.sort = apvSort.value; render(); });
+    document.querySelectorAll('[data-apv-note]').forEach(function(ta){
+      ta.addEventListener('change', function(){
+        var id = ta.getAttribute('data-apv-note');
+        var mat = state.materials.filter(function(m){ return m.id===id; })[0];
+        if (mat){ mat.note = ta.value.trim().slice(0, 1000); saveMaterials(); showToast('메모를 저장했어요'); }
+      });
+    });
+    document.querySelectorAll('[data-apv-unapprove]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-apv-unapprove');
+        var mat = state.materials.filter(function(m){ return m.id===id; })[0];
+        if (mat){ restoreToPending(mat); showToast('대기 목록으로 되돌렸어요'); }
+      });
+    });
 
     // compare tab
     document.querySelectorAll('[data-mode]').forEach(function(btn){
