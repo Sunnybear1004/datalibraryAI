@@ -41,7 +41,7 @@
   #archive-root button { font-family: inherit; cursor: pointer; }
   #archive-root input, #archive-root select { font-family: inherit; }
 
-  #archive-root .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 40px; }
+  #archive-root .wrap { max-width: 1040px; margin: 0 auto; padding: 24px clamp(16px, 3.5vw, 44px) 56px; }
 
   #archive-root .header {
     display: flex; align-items: flex-start; justify-content: space-between;
@@ -56,16 +56,16 @@
   #archive-root .menu-btn svg { width: 18px; height: 18px; }
   #archive-root .menu-btn:hover { border-color: var(--gold); color: var(--gold); }
   #archive-root .header .title-block .eyebrow {
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase;
     color: var(--gold); margin: 0 0 4px;
   }
   #archive-root .header h1 {
-    font-family: var(--font-display); font-weight: 600; font-size: 26px; margin: 0; color: var(--cream);
+    font-family: var(--font-display); font-weight: 600; font-size: 28px; margin: 0; color: var(--cream);
     letter-spacing: -0.01em;
   }
-  #archive-root .header .sub { font-size: 12px; color: var(--cream-soft); margin-top: 4px; }
+  #archive-root .header .sub { font-size: 14px; color: var(--cream-soft); margin-top: 4px; }
   #archive-root .header .counts {
-    text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--cream-soft); line-height: 1.7;
+    text-align: right; font-family: var(--font-mono); font-size: 13px; color: var(--cream-soft); line-height: 1.7;
   }
   #archive-root .header .counts b { color: var(--gold); font-weight: 600; }
 
@@ -79,7 +79,7 @@
     color: var(--cream-soft); position: relative; transition: color .15s ease;
   }
   #archive-root .tab svg { width: 18px; height: 18px; opacity: .75; }
-  #archive-root .tab span { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
+  #archive-root .tab span { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; }
   #archive-root .tab.active { color: var(--gold); }
   #archive-root .tab.active svg { opacity: 1; }
   #archive-root .tab.active::after {
@@ -101,13 +101,13 @@
     padding: 14px 10px 14px 18px; border-bottom: 1px solid var(--line-dark); margin-bottom: 6px;
   }
   #archive-root .menu-drawer-title {
-    font-family: var(--font-display); font-size: 16px; color: var(--cream);
+    font-family: var(--font-display); font-size: 18px; color: var(--cream);
   }
   #archive-root .menu-close-btn { background: transparent; border: none; color: var(--cream-soft); padding: 6px; }
   #archive-root .menu-close-btn svg { width: 18px; height: 18px; }
   #archive-root .menu-item {
     display: flex; align-items: center; gap: 11px; width: 100%; background: transparent; border: none;
-    color: var(--cream-soft); padding: 12px 18px; font-size: 14px; text-align: left;
+    color: var(--cream-soft); padding: 12px 18px; font-size: 16px; text-align: left;
   }
   #archive-root .menu-item svg { width: 18px; height: 18px; opacity: .75; flex-shrink: 0; }
   #archive-root .menu-item.active { color: var(--gold); }
@@ -115,7 +115,7 @@
   #archive-root .menu-item:hover:not(.active) { background: rgba(255,255,255,0.04); color: var(--paper-hi); }
   #archive-root .menu-cat-btn {
     display: flex; align-items: center; justify-content: space-between; width: 100%;
-    background: transparent; border: none; color: var(--cream-soft); padding: 12px 18px; font-size: 14px;
+    background: transparent; border: none; color: var(--cream-soft); padding: 12px 18px; font-size: 16px;
   }
   #archive-root .menu-cat-left { display: flex; align-items: center; gap: 11px; }
   #archive-root .menu-cat-btn svg.icon { width: 18px; height: 18px; opacity: .75; }
@@ -124,7 +124,7 @@
   #archive-root .menu-cat-btn.has-active { color: var(--gold); }
   #archive-root .menu-cat-btn.has-active svg.icon { opacity: 1; }
   #archive-root .menu-cat-btn:hover { background: rgba(255,255,255,0.04); }
-  #archive-root .menu-sub-list .menu-item { padding-left: 46px; font-size: 13px; }
+  #archive-root .menu-sub-list .menu-item { padding-left: 46px; font-size: 15px; }
 
   /* Opinions (issue / stance collection) */
   #archive-root .opn-card {
@@ -132,20 +132,20 @@
     background: transparent; width: 100%; text-align: left; display: block; color: var(--cream);
   }
   #archive-root .opn-card:hover { border-color: var(--gold-soft); }
-  #archive-root .opn-card h4 { font-family: var(--font-display); font-size: 16px; margin: 0 0 4px; }
-  #archive-root .opn-card .opn-card-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--cream-soft); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 8px; }
+  #archive-root .opn-card h4 { font-family: var(--font-display); font-size: 18px; margin: 0 0 4px; }
+  #archive-root .opn-card .opn-card-meta { font-family: var(--font-mono); font-size: 12px; color: var(--cream-soft); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 8px; }
   #archive-root .opn-mini-bar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,0.08); }
   #archive-root .opn-mini-bar span { height: 100%; }
   #archive-root .opn-back {
     display: inline-flex; align-items: center; gap: 6px; background: transparent; border: none;
-    color: var(--cream-soft); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase;
+    color: var(--cream-soft); font-family: var(--font-mono); font-size: 13px; text-transform: uppercase;
     letter-spacing: 0.04em; padding: 0; margin-bottom: 14px;
   }
   #archive-root .opn-back:hover { color: var(--gold); }
-  #archive-root .opn-issue-title { font-family: var(--font-display); font-size: 22px; margin: 0 0 4px; }
-  #archive-root .opn-issue-context { font-size: 12.5px; color: var(--cream-soft); margin: 0 0 20px; line-height: 1.6; }
+  #archive-root .opn-issue-title { font-family: var(--font-display); font-size: 24px; margin: 0 0 4px; }
+  #archive-root .opn-issue-context { font-size: 14.5px; color: var(--cream-soft); margin: 0 0 20px; line-height: 1.6; }
   #archive-root .opn-badge {
-    font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.04em;
+    font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em;
     padding: 2px 7px; border-radius: 10px; border: 1px solid var(--line-dark); color: var(--cream-soft);
     margin-left: 8px; white-space: nowrap;
   }
@@ -154,20 +154,21 @@
     display: flex; justify-content: space-between; gap: 10px; align-items: flex-start;
   }
   #archive-root .opn-item-body { flex: 1; min-width: 0; }
-  #archive-root .opn-text { font-size: 13px; line-height: 1.55; margin: 0 0 4px; }
-  #archive-root .opn-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--cream-soft); display: flex; align-items: center; flex-wrap: wrap; }
+  #archive-root .opn-text { font-size: 15px; line-height: 1.55; margin: 0 0 4px; }
+  #archive-root .opn-meta { font-family: var(--font-mono); font-size: 12px; color: var(--cream-soft); display: flex; align-items: center; flex-wrap: wrap; }
   #archive-root .opn-meta a { color: var(--gold); text-decoration: none; margin-left: 8px; }
   #archive-root .opn-del-btn { background: transparent; border: none; color: var(--cream-soft); padding: 2px 4px; flex-shrink: 0; }
   #archive-root .opn-del-btn:hover { color: var(--reject); }
   #archive-root .opn-group { margin-bottom: 22px; }
   #archive-root .opn-group-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
-  #archive-root .opn-group-label { font-family: var(--font-display); font-size: 15.5px; }
-  #archive-root .opn-group-pct { font-family: var(--font-mono); font-size: 12px; color: var(--gold); }
+  #archive-root .opn-group-label { font-family: var(--font-display); font-size: 17px; color: var(--cream); display: inline-flex; align-items: center; gap: 9px; }
+  #archive-root .opn-group-label i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+  #archive-root .opn-group-pct { font-family: var(--font-mono); font-size: 14px; color: var(--gold); }
   #archive-root .opn-bar-bg { height: 9px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; margin-bottom: 10px; }
   #archive-root .opn-bar { height: 100%; }
 
   /* Card */
-  #archive-root .deck { position: relative; height: 480px; margin-bottom: 18px; }
+  #archive-root .deck { position: relative; height: 580px; max-width: 640px; margin: 0 auto 22px; }
   #archive-root .card {
     position: absolute; inset: 0; background: var(--paper); color: var(--ink); border-radius: var(--radius);
     box-shadow: 0 18px 40px -12px rgba(0,0,0,0.5); padding: 0; overflow: hidden;
@@ -177,7 +178,7 @@
   #archive-root .card.top { z-index: 2; cursor: grab; }
   #archive-root .card-tab {
     position: absolute; top: 0; left: 22px; background: var(--gold); color: var(--bg-deep);
-    font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+    font-family: var(--font-mono); font-size: 13px; font-weight: 600; letter-spacing: 0.05em;
     padding: 5px 12px 6px; border-radius: 0 0 4px 4px; text-transform: uppercase;
   }
   #archive-root .card-perf {
@@ -187,43 +188,45 @@
   }
   #archive-root .card-body { padding: 20px 26px 10px; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
   #archive-root .card-title {
-    font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1.25; margin: 6px 0 4px;
+    font-family: var(--font-display); font-size: 24px; font-weight: 600; line-height: 1.25; margin: 6px 0 4px;
   }
   #archive-root .card-meta {
-    font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); text-transform: uppercase;
+    font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); text-transform: uppercase;
     letter-spacing: 0.04em; margin-bottom: 2px;
   }
   #archive-root .more-link {
-    font-family: var(--font-mono); font-size: 11px; color: var(--gold); text-decoration: none; letter-spacing: 0.03em;
+    font-family: var(--font-mono); font-size: 13px; color: var(--gold); text-decoration: none; letter-spacing: 0.03em;
     border-bottom: 1px solid var(--gold-soft); padding-bottom: 1px; touch-action: manipulation;
   }
   #archive-root .more-link:hover { border-color: var(--gold); }
   #archive-root .no-link {
-    font-family: var(--font-mono); font-size: 11px; color: var(--paper-line); font-style: italic;
+    font-family: var(--font-mono); font-size: 13px; color: var(--paper-line); font-style: italic;
   }
   #archive-root .card-more { margin-bottom: 14px; }
   #archive-root .card-more.inline-more { margin: 6px 0 0; }
   #archive-root .match-note {
-    font-size: 11px; color: var(--bg-deep); background: rgba(200,155,60,0.28); border-left: 2px solid var(--gold);
+    font-size: 13px; color: var(--bg-deep); background: rgba(200,155,60,0.28); border-left: 2px solid var(--gold);
     padding: 6px 10px; margin-bottom: 12px; font-style: italic; border-radius: 0 3px 3px 0;
   }
   #archive-root .ai-summary { margin-bottom: 12px; }
   #archive-root .ai-summary-label {
-    font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
+    font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
     color: var(--ink-soft); margin-bottom: 4px;
   }
   #archive-root .ai-summary-text {
-    font-size: 12.5px; line-height: 1.55; color: var(--ink); background: rgba(32,40,31,0.05);
+    font-size: 14.5px; line-height: 1.55; color: var(--ink); background: rgba(32,40,31,0.05);
     border-radius: 3px; padding: 8px 10px; margin: 0 0 6px;
   }
-  #archive-root .ai-summary-status { font-size: 11px; color: var(--ink-soft); font-style: italic; }
-  #archive-root .ai-summary-error { font-size: 11px; color: var(--reject); margin: 4px 0 0; }
+  #archive-root .ai-summary-status { font-size: 13px; color: var(--ink-soft); font-style: italic; }
+  #archive-root .ai-summary-error { font-size: 13px; color: var(--reject); margin: 4px 0 0; }
+  #archive-root .card .btn.ghost { color: var(--ink); border-color: rgba(32,40,31,0.35); }
+  #archive-root .card .btn.ghost:hover { color: var(--bg); border-color: var(--bg); background: rgba(32,40,31,0.06); }
   #archive-root .btn.locked { opacity: 0.5; }
   #archive-root .btn.locked:hover { border-color: var(--reject); color: var(--reject); }
   #archive-root .card-scores { border-top: 1px dashed var(--paper-line); padding-top: 10px; margin-top: auto; }
   #archive-root .score-row {
     display: flex; align-items: baseline; justify-content: space-between; font-family: var(--font-mono);
-    font-size: 12px; padding: 3px 0; color: var(--ink);
+    font-size: 14px; padding: 3px 0; color: var(--ink);
   }
   #archive-root .score-row .dots { flex: 1; overflow: hidden; white-space: nowrap; color: var(--paper-line); margin: 0 6px; }
   #archive-root .score-row b { color: var(--ink); font-weight: 600; min-width: 26px; text-align: right; }
@@ -246,54 +249,55 @@
   #archive-root .stamp-btn svg { width: 24px; height: 24px; }
 
   #archive-root .empty {
-    height: 480px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 480px; display: flex; flex-direction: column; align-items: center; justify-content: center;
     border: 1px dashed var(--line-dark); border-radius: var(--radius); text-align: center; padding: 20px; gap: 10px;
   }
-  #archive-root .empty h3 { font-family: var(--font-display); font-size: 20px; margin: 0; }
-  #archive-root .empty p { font-size: 13px; color: var(--cream-soft); max-width: 320px; margin: 0; }
+  #archive-root .empty h3 { font-family: var(--font-display); font-size: 22px; margin: 0; }
+  #archive-root .empty p { font-size: 15px; color: var(--cream-soft); max-width: 480px; margin: 0; line-height: 1.6; }
   #archive-root .empty button { margin-top: 6px; }
 
   #archive-root .btn {
     background: var(--gold); color: var(--bg-deep); border: none; padding: 10px 18px; border-radius: 3px;
-    font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase;
+    font-family: var(--font-mono); font-size: 14px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase;
   }
   #archive-root .btn:hover { background: #d8ab4d; }
   #archive-root .btn.ghost { background: transparent; border: 1px solid var(--line-dark); color: var(--cream); }
   #archive-root .btn.ghost:hover { border-color: var(--gold); color: var(--gold); }
-  #archive-root .btn.small { padding: 6px 12px; font-size: 11px; }
+  #archive-root .btn.small { padding: 6px 12px; font-size: 13px; }
   #archive-root .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   #archive-root .section-title {
-    font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+    font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em;
     color: var(--gold); margin: 0 0 12px; display: flex; align-items: center; gap: 8px;
   }
   #archive-root .section-title::after { content: ''; flex: 1; height: 1px; background: var(--line-dark); }
+  #archive-root .section-title:not(:first-child) { margin-top: 30px; }
 
   /* Form */
   #archive-root .field { margin-bottom: 16px; }
   #archive-root .field label {
-    display: block; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase;
+    display: block; font-family: var(--font-mono); font-size: 13px; text-transform: uppercase;
     letter-spacing: 0.05em; color: var(--cream-soft); margin-bottom: 6px;
   }
   #archive-root .field input[type=text], #archive-root .field select, #archive-root .field textarea {
     width: 100%; background: var(--paper); color: var(--ink); border: none; border-radius: 3px;
-    padding: 10px 12px; font-size: 14px; resize: vertical;
+    padding: 10px 12px; font-size: 16px; resize: vertical;
   }
-  #archive-root .field textarea { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; }
-  #archive-root .bulk-note { font-size: 12px; color: var(--cream-soft); margin-bottom: 18px; line-height: 1.6; border-left: 2px solid var(--gold-soft); padding-left: 12px; }
+  #archive-root .field textarea { font-family: var(--font-mono); font-size: 14.5px; line-height: 1.6; }
+  #archive-root .bulk-note { font-size: 14px; color: var(--cream-soft); margin-bottom: 18px; line-height: 1.6; border-left: 2px solid var(--gold-soft); padding-left: 12px; }
   #archive-root .field-row { display: flex; gap: 12px; }
   #archive-root .field-row .field { flex: 1; }
-  #archive-root .toggle-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 13px; color: var(--cream-soft); }
+  #archive-root .toggle-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 15px; color: var(--cream-soft); }
   #archive-root .slider-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 16px; }
   #archive-root .slider-row { display: flex; align-items: center; gap: 10px; }
-  #archive-root .slider-row label { width: 110px; font-size: 12px; color: var(--cream-soft); flex-shrink: 0; }
+  #archive-root .slider-row label { width: 110px; font-size: 14px; color: var(--cream-soft); flex-shrink: 0; }
   #archive-root .slider-row input[type=range] { flex: 1; accent-color: var(--gold); }
-  #archive-root .slider-row .val { font-family: var(--font-mono); width: 28px; text-align: right; color: var(--gold); font-size: 12px; }
+  #archive-root .slider-row .val { font-family: var(--font-mono); width: 28px; text-align: right; color: var(--gold); font-size: 14px; }
 
   /* Rejected list */
   #archive-root .rej-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
   #archive-root .chip {
-    font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em;
+    font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em;
     padding: 5px 10px; border-radius: 20px; border: 1px solid var(--line-dark); color: var(--cream-soft);
   }
   #archive-root .chip b { color: var(--gold); margin-left: 4px; }
@@ -301,15 +305,15 @@
     border: 1px solid var(--line-dark); border-radius: 4px; padding: 14px 16px; margin-bottom: 10px;
     display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
   }
-  #archive-root .rej-item .info h4 { font-family: var(--font-display); font-size: 16px; margin: 0 0 4px; }
-  #archive-root .rej-item .info .tag { font-family: var(--font-mono); font-size: 10px; color: var(--reject); text-transform: uppercase; }
-  #archive-root .rej-item .info .meta2 { font-size: 11px; color: var(--cream-soft); margin-top: 4px; }
+  #archive-root .rej-item .info h4 { font-family: var(--font-display); font-size: 18px; margin: 0 0 4px; }
+  #archive-root .rej-item .info .tag { font-family: var(--font-mono); font-size: 12px; color: var(--reject); text-transform: uppercase; }
+  #archive-root .rej-item .info .meta2 { font-size: 13px; color: var(--cream-soft); margin-top: 4px; }
 
   /* Compare */
   #archive-root .compare-controls { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; flex-wrap: wrap; }
   #archive-root .mode-toggle { display: flex; border: 1px solid var(--line-dark); border-radius: 20px; overflow: hidden; }
   #archive-root .mode-toggle button {
-    background: transparent; border: none; color: var(--cream-soft); padding: 7px 16px; font-size: 12px; font-family: var(--font-mono);
+    background: transparent; border: none; color: var(--cream-soft); padding: 7px 16px; font-size: 14px; font-family: var(--font-mono);
   }
   #archive-root .mode-toggle button.active { background: var(--gold); color: var(--bg-deep); }
   #archive-root .mode-toggle button.locked { color: var(--paper-line); }
@@ -320,33 +324,33 @@
   }
   #archive-root .compare-card .letter {
     position: absolute; top: -10px; left: 12px; background: var(--bg-deep); color: var(--gold);
-    font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    font-family: var(--font-mono); font-size: 13px; padding: 2px 8px; border-radius: 10px;
   }
-  #archive-root .compare-card h4 { font-family: var(--font-display); font-size: 16px; margin: 6px 0 4px; }
-  #archive-root .compare-card .meta2 { font-family: var(--font-mono); font-size: 10px; color: var(--ink-soft); text-transform: uppercase; }
+  #archive-root .compare-card h4 { font-family: var(--font-display); font-size: 18px; margin: 6px 0 4px; }
+  #archive-root .compare-card .meta2 { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); text-transform: uppercase; }
   #archive-root .crit-row { border: 1px solid var(--line-dark); border-radius: 4px; padding: 10px 14px; margin-bottom: 8px; }
-  #archive-root .crit-row .crit-label { font-size: 12px; color: var(--cream-soft); margin-bottom: 8px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.03em; }
+  #archive-root .crit-row .crit-label { font-size: 14px; color: var(--cream-soft); margin-bottom: 8px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.03em; }
   #archive-root .crit-choices { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; }
   #archive-root .crit-choices button {
-    background: transparent; border: 1px solid var(--line-dark); color: var(--cream); padding: 7px 6px; border-radius: 3px; font-size: 12px;
+    background: transparent; border: 1px solid var(--line-dark); color: var(--cream); padding: 7px 6px; border-radius: 3px; font-size: 14px;
   }
   #archive-root .crit-choices button.picked { background: var(--gold); color: var(--bg-deep); border-color: var(--gold); }
-  #archive-root .crit-choices .tie-btn { font-family: var(--font-mono); font-size: 10px; color: var(--cream-soft); border: none; background: transparent; }
+  #archive-root .crit-choices .tie-btn { font-family: var(--font-mono); font-size: 12px; color: var(--cream-soft); border: none; background: transparent; }
   #archive-root .overall-box { border: 1px solid var(--gold-soft); border-radius: 4px; padding: 14px; margin: 18px 0; }
-  #archive-root .overall-box .q { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gold); margin-bottom: 10px; }
+  #archive-root .overall-box .q { font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gold); margin-bottom: 10px; }
   #archive-root .overall-choices { display: flex; gap: 10px; }
   #archive-root .overall-choices button {
-    flex: 1; background: transparent; border: 1px solid var(--line-dark); color: var(--cream); padding: 10px; border-radius: 3px; font-size: 13px;
+    flex: 1; background: transparent; border: 1px solid var(--line-dark); color: var(--cream); padding: 10px; border-radius: 3px; font-size: 15px;
   }
   #archive-root .overall-choices button.picked { background: var(--approve); border-color: var(--approve); color: #fff; }
 
   /* Profile */
   #archive-root .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 26px; }
   #archive-root .stat-box { border: 1px solid var(--line-dark); border-radius: 4px; padding: 12px; text-align: center; }
-  #archive-root .stat-box .n { font-family: var(--font-display); font-size: 24px; color: var(--gold); }
-  #archive-root .stat-box .l { font-family: var(--font-mono); font-size: 10px; color: var(--cream-soft); text-transform: uppercase; margin-top: 2px; }
+  #archive-root .stat-box .n { font-family: var(--font-display); font-size: 26px; color: var(--gold); }
+  #archive-root .stat-box .l { font-family: var(--font-mono); font-size: 12px; color: var(--cream-soft); text-transform: uppercase; margin-top: 2px; }
   #archive-root .weight-row { margin-bottom: 10px; }
-  #archive-root .weight-row .wl { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  #archive-root .weight-row .wl { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
   #archive-root .weight-row .wl b { font-family: var(--font-mono); color: var(--gold); }
   #archive-root .weight-bar-bg { height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
   #archive-root .weight-bar { height: 100%; border-radius: 4px; }
@@ -354,14 +358,14 @@
     display: flex; justify-content: space-between; align-items: center; padding: 10px 14px;
     border: 1px solid var(--line-dark); border-radius: 4px; margin-bottom: 8px;
   }
-  #archive-root .rec-item .t { font-size: 13px; }
-  #archive-root .rec-item .t .f { display: block; font-family: var(--font-mono); font-size: 10px; color: var(--cream-soft); text-transform: uppercase; margin-top: 2px; }
+  #archive-root .rec-item .t { font-size: 15px; }
+  #archive-root .rec-item .t .f { display: block; font-family: var(--font-mono); font-size: 12px; color: var(--cream-soft); text-transform: uppercase; margin-top: 2px; }
   #archive-root .rec-item .pct { font-family: var(--font-mono); color: var(--gold); font-weight: 600; }
-  #archive-root .dist-row { display: flex; justify-content: space-between; font-size: 12px; padding: 6px 0; border-bottom: 1px solid var(--line-dark); }
+  #archive-root .dist-row { display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-bottom: 1px solid var(--line-dark); }
   #archive-root .acct-block { border: 1px solid var(--line-dark); border-radius: 4px; padding: 16px; margin-bottom: 14px; }
   #archive-root .acct-block.acct-danger { border-color: rgba(181,87,63,0.4); }
-  #archive-root .acct-label { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold); margin-bottom: 12px; }
-  #archive-root .acct-msg { font-size: 12px; margin: -4px 0 12px; }
+  #archive-root .acct-label { font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold); margin-bottom: 12px; }
+  #archive-root .acct-msg { font-size: 14px; margin: -4px 0 12px; }
   #archive-root .acct-msg.ok { color: var(--approve); }
   #archive-root .acct-msg.err { color: var(--reject); }
   #archive-root .model-list {
@@ -369,45 +373,51 @@
   }
   #archive-root .model-list-item {
     display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left; background: transparent;
-    border: none; border-bottom: 1px solid var(--line-dark); color: var(--cream); padding: 10px 12px; font-size: 12.5px;
+    border: none; border-bottom: 1px solid var(--line-dark); color: var(--cream); padding: 10px 12px; font-size: 14.5px;
   }
   #archive-root .model-list-item:last-child { border-bottom: none; }
   #archive-root .model-list-item:hover { background: rgba(200,155,60,0.08); }
   #archive-root .model-list-item.active { background: rgba(200,155,60,0.18); }
   #archive-root .model-list-item .mn { font-family: var(--font-mono); color: var(--gold); }
-  #archive-root .model-list-item .md { color: var(--cream-soft); font-size: 11.5px; }
-  #archive-root .model-list-item .mc { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--approve); white-space: nowrap; }
+  #archive-root .model-list-item .md { color: var(--cream-soft); font-size: 13.5px; }
+  #archive-root .model-list-item .mc { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--approve); white-space: nowrap; }
 
   #archive-root .toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--paper); color: var(--ink);
-    padding: 10px 20px; border-radius: 20px; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); z-index: 50;
+    padding: 10px 20px; border-radius: 20px; font-size: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); z-index: 50;
   }
   #archive-root .modal-overlay {
     position: fixed; inset: 0; background: rgba(15,36,34,0.75); display: flex; align-items: center; justify-content: center;
     z-index: 40; padding: 20px;
   }
   #archive-root .modal {
-    background: var(--paper); color: var(--ink); border-radius: 6px; padding: 24px; max-width: 380px; width: 100%;
+    background: var(--paper); color: var(--ink); border-radius: 6px; padding: 28px; max-width: 460px; width: 100%;
   }
-  #archive-root .modal h3 { font-family: var(--font-display); font-size: 19px; margin: 0 0 4px; }
-  #archive-root .modal .sub2 { font-size: 12px; color: var(--ink-soft); margin-bottom: 16px; }
+  #archive-root .modal h3 { font-family: var(--font-display); font-size: 21px; margin: 0 0 4px; }
+  #archive-root .modal .sub2 { font-size: 14px; color: var(--ink-soft); margin-bottom: 16px; }
   #archive-root .reason-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
   #archive-root .reason-grid button {
-    background: var(--bg); color: var(--cream); border: 1px solid transparent; padding: 10px 8px; border-radius: 4px; font-size: 12px;
+    background: var(--bg); color: var(--cream); border: 1px solid transparent; padding: 10px 8px; border-radius: 4px; font-size: 14px;
   }
   #archive-root .reason-grid button:hover { border-color: var(--gold); }
-  #archive-root .modal .cancel { width: 100%; background: transparent; border: 1px solid var(--paper-line); color: var(--ink-soft); padding: 8px; border-radius: 4px; font-size: 12px; }
+  #archive-root .modal .cancel { width: 100%; background: transparent; border: 1px solid var(--paper-line); color: var(--ink-soft); padding: 8px; border-radius: 4px; font-size: 14px; }
 
+  @media (max-width: 600px) {
+    #archive-root .header { flex-wrap: wrap; row-gap: 12px; }
+    #archive-root .header .counts { width: 100%; display: flex; gap: 18px; text-align: left; line-height: 1.4; }
+    #archive-root .header .counts br { display: none; }
+    #archive-root .header .title-block .eyebrow { letter-spacing: 0.1em; }
+  }
   @media (max-width: 480px) {
     #archive-root .stat-grid { grid-template-columns: repeat(2,1fr); }
     #archive-root .compare-pair { grid-template-columns: 1fr; }
     #archive-root .crit-choices { grid-template-columns: 1fr 1fr; }
-    #archive-root .card-title { font-size: 18px; }
+    #archive-root .card-title { font-size: 20px; }
   }
 </style>
 
 <div id="archive-root"><div class="wrap" id="app-mount">
-  <div style="padding:60px 0;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--cream-soft);">서고를 여는 중...</div>
+  <div style="padding:60px 0;text-align:center;font-family:var(--font-mono);font-size:14px;color:var(--cream-soft);">서고를 여는 중...</div>
 </div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
@@ -830,7 +840,7 @@
 
   // ---------- rendering ----------
   function loadingHtml(msg){
-    return '<div style="padding:80px 0;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--cream-soft);">' + escapeHtml(msg) + '</div>';
+    return '<div style="padding:80px 0;text-align:center;font-family:var(--font-mono);font-size:14px;color:var(--cream-soft);">' + escapeHtml(msg) + '</div>';
   }
 
   function firebaseErrorHtml(){
@@ -846,13 +856,13 @@
     return '' +
       '<div style="max-width:340px;margin:50px auto 0;">' +
         '<div style="text-align:center;margin-bottom:26px;">' +
-          '<p class="eyebrow" style="color:var(--gold);font-family:var(--font-mono);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;margin:0 0 6px;">개인 자료 서고</p>' +
-          '<h1 style="font-family:var(--font-display);font-size:26px;margin:0;color:var(--cream);">' + (mode==='login' ? '로그인' : '회원가입') + '</h1>' +
-          '<div style="font-size:12px;color:var(--cream-soft);margin-top:6px;">계정마다 자신만의 평가 기록과 성향 분석이 저장돼요</div>' +
+          '<p class="eyebrow" style="color:var(--gold);font-family:var(--font-mono);font-size:13px;letter-spacing:0.18em;text-transform:uppercase;margin:0 0 6px;">개인 자료 서고</p>' +
+          '<h1 style="font-family:var(--font-display);font-size:28px;margin:0;color:var(--cream);">' + (mode==='login' ? '로그인' : '회원가입') + '</h1>' +
+          '<div style="font-size:14px;color:var(--cream-soft);margin-top:6px;">계정마다 자신만의 평가 기록과 성향 분석이 저장돼요</div>' +
         '</div>' +
         '<div class="field"><label>이메일</label><input type="text" id="auth-email" placeholder="you@example.com" /></div>' +
         '<div class="field"><label>비밀번호</label><input type="password" id="auth-pw" placeholder="6자 이상" /></div>' +
-        (err ? '<p style="color:var(--reject);font-size:12px;margin:-6px 0 14px;">' + escapeHtml(err) + '</p>' : '') +
+        (err ? '<p style="color:var(--reject);font-size:14px;margin:-6px 0 14px;">' + escapeHtml(err) + '</p>' : '') +
         '<button class="btn" id="auth-submit" style="width:100%;margin-bottom:10px;" ' + (state.authLoading?'disabled':'') + '>' + (state.authLoading ? '처리 중...' : (mode==='login' ? '로그인' : '계정 만들기')) + '</button>' +
         '<button class="btn ghost small" id="auth-toggle" style="width:100%;">' + (mode==='login' ? '계정이 없으신가요? 회원가입' : '이미 계정이 있으신가요? 로그인') + '</button>' +
       '</div>';
@@ -950,7 +960,7 @@
   }
 
   function userBarHtml(){
-    return '<div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:8px;font-family:var(--font-mono);font-size:11px;color:var(--cream-soft);">' +
+    return '<div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:8px;font-family:var(--font-mono);font-size:13px;color:var(--cream-soft);">' +
       escapeHtml(state.user.email) +
       '<button id="logout-btn" class="btn ghost small" style="padding:4px 10px;">로그아웃</button>' +
     '</div>';
@@ -1070,8 +1080,8 @@
     var brief = buildProfileBrief(approved, h.field);
 
     var html = '<div style="text-align:center;margin-bottom:22px;">' +
-      '<p class="eyebrow" style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);margin:0 0 6px;">메인화면</p>' +
-      '<h2 style="font-family:var(--font-display);font-size:22px;margin:0;color:var(--cream);">당신의 성향에 맞는 자료 찾기</h2>' +
+      '<p class="eyebrow" style="font-family:var(--font-mono);font-size:13px;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);margin:0 0 6px;">메인화면</p>' +
+      '<h2 style="font-family:var(--font-display);font-size:24px;margin:0;color:var(--cream);">당신의 성향에 맞는 자료 찾기</h2>' +
     '</div>';
 
     if (hasProfile){
@@ -1079,7 +1089,7 @@
         ? brief.criteria.map(function(c){ return '<span class="chip">' + c.label + '</span>'; }).join('')
         : '<span class="no-link">아직 뚜렷한 기준이 없어요</span>';
       html += '<div class="acct-block"><div class="acct-label">지금까지 학습된 프로필</div>' +
-        '<div style="font-size:13px;margin-bottom:10px;">선호 분야 · <b style="color:var(--gold);">' + escapeHtml(brief.field || '아직 없음') + '</b></div>' +
+        '<div style="font-size:15px;margin-bottom:10px;">선호 분야 · <b style="color:var(--gold);">' + escapeHtml(brief.field || '아직 없음') + '</b></div>' +
         '<div class="rej-chips" style="margin-bottom:0;">' + criteriaChips + '</div>' +
         '</div>';
     } else {
@@ -1094,7 +1104,7 @@
       '<div class="field"><label>키워드 (선택)</label><input type="text" id="home-keyword" placeholder="예: 양자컴퓨팅, 금리 인상" value="' + escapeHtml(h.keyword||'') + '" /></div>' +
       '<div class="field"><label>분야</label><select id="home-field">' + fieldOptions + '</select></div>' +
     '</div>' +
-    '<p style="font-size:12px;color:var(--cream-soft);margin:-8px 0 16px;">키워드를 비워두면 학습된 성향만으로, 입력하면 그 키워드를 성향과 함께 반영해서 찾아요.</p>';
+    '<p style="font-size:14px;color:var(--cream-soft);margin:-8px 0 16px;">키워드를 비워두면 학습된 성향만으로, 입력하면 그 키워드를 성향과 함께 반영해서 찾아요.</p>';
 
     html += '<div class="field" style="max-width:200px;"><label>수집 개수 (최대 10)</label><input type="text" id="home-count" value="' + h.count + '" /></div>';
     html += '<div class="toggle-row"><input type="checkbox" id="home-ai-score" checked /><label for="home-ai-score" style="margin:0;">등록할 때 AI가 8개 요소 점수를 자동으로 매기기</label></div>' +
@@ -1102,7 +1112,7 @@
         '<option value="gemini" selected>Gemini</option>' +
       '</select></div>';
     html += '<button class="btn" id="home-collect" ' + (h.loading?'disabled':'') + '>' + (h.loading ? '찾는 중...' : '내 성향에 맞는 자료 찾기') + '</button>';
-    if (h.statusMsg) html += '<p style="margin-top:10px;font-size:12px;color:var(--cream-soft);">' + escapeHtml(h.statusMsg) + '</p>';
+    if (h.statusMsg) html += '<p style="margin-top:10px;font-size:14px;color:var(--cream-soft);">' + escapeHtml(h.statusMsg) + '</p>';
 
     if (h.lastAdded.length){
       html += '<p class="section-title" style="margin-top:26px;">방금 찾은 자료 (' + h.lastAdded.length + '개)</p>';
@@ -1168,10 +1178,10 @@
         '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="f-score-engine">' +
           '<option value="gemini" selected>Gemini</option>' +
         '</select></div>' +
-        '<p id="ai-score-note" style="font-size:12px;color:var(--cream-soft);margin:-8px 0 16px;">제목·출처·URL을 바탕으로 AI가 8개 요소 점수를 추정해요.</p>' +
+        '<p id="ai-score-note" style="font-size:14px;color:var(--cream-soft);margin:-8px 0 16px;">제목·출처·URL을 바탕으로 AI가 8개 요소 점수를 추정해요.</p>' +
       '</div>' +
       '<button class="btn" id="btn-add-material">자료 추가하기</button>' +
-      '<div id="add-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
+      '<div id="add-status" style="margin-top:10px;font-size:14px;color:var(--cream-soft);"></div>';
   }
 
   // ---- Bulk add tab ----
@@ -1199,13 +1209,13 @@
           '<option value="gemini" selected>Gemini</option>' +
         '</select></div>' +
         '<button class="btn" id="bulk-add-urls">목록 추가하기</button>' +
-        '<div id="bulk-urls-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
+        '<div id="bulk-urls-status" style="margin-top:10px;font-size:14px;color:var(--cream-soft);"></div>';
     } else if (b.mode === 'generate') {
       html += '<div class="field-row">' +
           '<div class="field"><label>분야</label><select id="bulk-gen-field"><option value="random">무작위</option>' + fieldOptions + '</select></div>' +
           '<div class="field"><label>개수 (최대 30)</label><input type="text" id="bulk-gen-count" value="5" /></div>' +
         '</div>' +
-        '<p style="font-size:12px;color:var(--cream-soft);margin-bottom:14px;">평가 요소 점수가 무작위로 채워진 샘플 자료를 생성합니다. 카드 평가·상대 비교 기능을 테스트하거나 학습 데이터를 빠르게 늘리고 싶을 때 사용하세요.</p>' +
+        '<p style="font-size:14px;color:var(--cream-soft);margin-bottom:14px;">평가 요소 점수가 무작위로 채워진 샘플 자료를 생성합니다. 카드 평가·상대 비교 기능을 테스트하거나 학습 데이터를 빠르게 늘리고 싶을 때 사용하세요.</p>' +
         '<button class="btn" id="bulk-generate">샘플 자동 생성하기</button>';
     } else if (b.mode === 'selective') {
       html += selectiveCollectHtml(fieldOptions);
@@ -1219,7 +1229,7 @@
           '<option value="gemini" selected>Gemini</option>' +
         '</select></div>' +
         '<button class="btn" id="tavily-collect">Tavily로 검색하기</button>' +
-        '<div id="tavily-status" style="margin-top:10px;font-size:12px;color:var(--cream-soft);"></div>';
+        '<div id="tavily-status" style="margin-top:10px;font-size:14px;color:var(--cream-soft);"></div>';
     }
     return html;
   }
@@ -1323,7 +1333,7 @@
 
     var info = selectedProfileInfo();
     if (info.pending){
-      return html + '<p style="font-size:12px;color:var(--cream-soft);">공유된 성향을 불러오는 중...</p>';
+      return html + '<p style="font-size:14px;color:var(--cream-soft);">공유된 성향을 불러오는 중...</p>';
     }
     if (info.error){
       return html + '<div class="empty" style="height:auto;padding:24px 20px;"><h3>성향을 불러오지 못했어요</h3><p>' + escapeHtml(info.error) + '</p></div>';
@@ -1352,10 +1362,10 @@
     }).join('');
 
     html += '<div class="acct-block"><div class="acct-label">' + (profile.source === 'self' ? '필터링에 쓰일 내 프로필' : '필터링에 쓰일 공유받은 프로필 · ' + escapeHtml(profile.label)) + '</div>' +
-      '<div style="font-size:13px;margin-bottom:10px;">선호 분야 · <b style="color:var(--gold);">' + escapeHtml(profile.field || '아직 없음') + '</b> · 학습 ' + profile.trained + '회</div>' +
-      '<div style="font-size:11px;color:var(--cream-soft);margin-bottom:6px;">중요하게 여기는 기준 (가중치 높은 순)</div>' +
+      '<div style="font-size:15px;margin-bottom:10px;">선호 분야 · <b style="color:var(--gold);">' + escapeHtml(profile.field || '아직 없음') + '</b> · 학습 ' + profile.trained + '회</div>' +
+      '<div style="font-size:13px;color:var(--cream-soft);margin-bottom:6px;">중요하게 여기는 기준 (가중치 높은 순)</div>' +
       '<div class="rej-chips" style="margin-bottom:12px;">' + chips + '</div>' +
-      '<div style="font-size:11px;color:var(--cream-soft);margin-bottom:6px;">반려 이유 분포</div>' +
+      '<div style="font-size:13px;color:var(--cream-soft);margin-bottom:6px;">반려 이유 분포</div>' +
       '<div class="rej-chips" style="margin-bottom:0;">' + rejChips + '</div></div>';
 
     html += '<div class="field-row">' +
@@ -1366,9 +1376,9 @@
         '<div class="field"><label>목표 수량 (최대 30)</label><input type="text" id="sel-count" value="' + s.count + '" /></div>' +
         '<div class="field"><label>AI 필터 엄격도</label><select id="sel-strict">' + strictOptions + '</select></div>' +
       '</div>' +
-      '<p style="font-size:12px;color:var(--cream-soft);margin:-8px 0 16px;">' + escapeHtml((STRICT_LEVELS[s.strict] || STRICT_LEVELS.normal).hint) + ' 통과한 자료는 AI가 매긴 8개 요소 점수와 통과 이유가 함께 등록돼요.' + (profile.source === 'shared' ? ' 공유받은 성향은 수집할 때마다 공유한 사람의 최신 상태로 다시 불러와요.' : '') + '</p>' +
+      '<p style="font-size:14px;color:var(--cream-soft);margin:-8px 0 16px;">' + escapeHtml((STRICT_LEVELS[s.strict] || STRICT_LEVELS.normal).hint) + ' 통과한 자료는 AI가 매긴 8개 요소 점수와 통과 이유가 함께 등록돼요.' + (profile.source === 'shared' ? ' 공유받은 성향은 수집할 때마다 공유한 사람의 최신 상태로 다시 불러와요.' : '') + '</p>' +
       '<button class="btn" id="sel-collect" ' + (s.loading?'disabled':'') + '>' + (s.loading ? '고르는 중...' : '분별해서 수집하기') + '</button>';
-    if (s.statusMsg) html += '<p style="margin-top:10px;font-size:12px;color:var(--cream-soft);">' + escapeHtml(s.statusMsg) + '</p>';
+    if (s.statusMsg) html += '<p style="margin-top:10px;font-size:14px;color:var(--cream-soft);">' + escapeHtml(s.statusMsg) + '</p>';
 
     if (s.lastAdded.length){
       html += '<p class="section-title" style="margin-top:26px;">방금 골라 담은 자료 (' + s.lastAdded.length + '개)</p>';
@@ -1539,7 +1549,7 @@
   function shareBlockHtml(){
     var sh = state.sharing, ui = state.shareUi;
     var html = '<p class="section-title" style="margin-top:30px;">내 성향 공유하기</p>' +
-      '<p style="font-size:12px;color:var(--cream-soft);margin:-4px 0 14px;line-height:1.6;">공유 코드를 만들면, 그 코드를 아는 다른 사용자가 "분별 수집"에서 내 성향(기준별 가중치, 반려 이유 분포, 선호 분야)으로 자료를 걸러 모을 수 있어요. 내 이메일이나 계정 정보는 공유되지 않고, 카드 평가를 할 때마다 공유된 내용도 자동으로 최신이 돼요.</p>' +
+      '<p style="font-size:14px;color:var(--cream-soft);margin:-4px 0 14px;line-height:1.6;">공유 코드를 만들면, 그 코드를 아는 다른 사용자가 "분별 수집"에서 내 성향(기준별 가중치, 반려 이유 분포, 선호 분야)으로 자료를 걸러 모을 수 있어요. 내 이메일이나 계정 정보는 공유되지 않고, 카드 평가를 할 때마다 공유된 내용도 자동으로 최신이 돼요.</p>' +
       '<div class="acct-block">';
     if (!sh.code){
       html += '<div class="field"><label>표시될 이름 (선택)</label><input type="text" id="share-nickname" placeholder="예: 민수의 성향" value="' + escapeHtml(sh.nickname || '') + '" /></div>' +
@@ -1547,7 +1557,7 @@
         '<button class="btn" id="share-create" ' + (ui.loading ? 'disabled' : '') + '>' + (ui.loading ? '만드는 중...' : '공유 코드 만들기') + '</button>';
     } else {
       html += '<div class="acct-label">공유 중인 코드</div>' +
-        '<div style="font-family:var(--font-mono);font-size:22px;letter-spacing:0.12em;color:var(--gold);margin-bottom:12px;">' + fmtShareCode(sh.code) + '</div>' +
+        '<div style="font-family:var(--font-mono);font-size:24px;letter-spacing:0.12em;color:var(--gold);margin-bottom:12px;">' + fmtShareCode(sh.code) + '</div>' +
         '<div style="display:flex;gap:8px;margin-bottom:16px;"><button class="btn ghost small" id="share-copy">코드 복사</button></div>' +
         '<div class="field"><label>표시될 이름</label><input type="text" id="share-nickname" value="' + escapeHtml(sh.nickname || '') + '" /></div>' +
         '<div class="toggle-row"><input type="checkbox" id="share-titles" ' + (sh.includeTitles ? 'checked' : '') + ' /><label for="share-titles" style="margin:0;">승인·반려한 자료 제목 몇 개도 예시로 함께 공유</label></div>' +
@@ -1581,7 +1591,7 @@
 
   function opinionsListHtml(){
     var html = '<p class="section-title">의견 수집</p>' +
-      '<p style="font-size:12.5px;color:var(--cream-soft);margin:-10px 0 20px;line-height:1.6;">사회 이슈나 정책을 하나 등록하면, 그에 대한 여러 사람·전문가의 의견을 AI로 자동 수집하거나 직접 입력해서 모을 수 있어요. 어느 정도 모이면 AI가 비슷한 입장끼리 자동으로 묶어서 비율로 보여줘요.</p>';
+      '<p style="font-size:14.5px;color:var(--cream-soft);margin:-10px 0 20px;line-height:1.6;">사회 이슈나 정책을 하나 등록하면, 그에 대한 여러 사람·전문가의 의견을 AI로 자동 수집하거나 직접 입력해서 모을 수 있어요. 어느 정도 모이면 AI가 비슷한 입장끼리 자동으로 묶어서 비율로 보여줘요.</p>';
 
     html += '<div class="acct-block">' +
       '<div class="acct-label">새 이슈 등록</div>' +
@@ -1627,11 +1637,11 @@
     // --- collection controls ---
     html += '<div class="acct-block">' +
       '<div class="acct-label">AI로 의견 자동 수집</div>' +
-      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">아래 주제로 웹에서 찬성·반대·전문가 분석 등 다양한 시각의 글을 찾아서, AI가 각 출처의 입장을 한두 문장으로 요약해 가져와요.</p>' +
+      '<p style="font-size:14px;color:var(--cream-soft);margin:0 0 12px;">아래 주제로 웹에서 찬성·반대·전문가 분석 등 다양한 시각의 글을 찾아서, AI가 각 출처의 입장을 한두 문장으로 요약해 가져와요.</p>' +
       '<div class="field"><label>검색 주제</label><input type="text" id="opn-collect-topic" value="' + escapeHtml(ov.collectTopic || issue.title) + '" /></div>' +
       '<div class="field" style="max-width:160px;"><label>수집 개수 (최대 30)</label><input type="text" id="opn-collect-count" value="' + (ov.collectCount||6) + '" /></div>' +
       '<button class="btn" id="opn-collect-btn" ' + (ov.collectLoading?'disabled':'') + '>' + (ov.collectLoading ? '수집하는 중...' : 'AI로 의견 찾기') + '</button>' +
-      (ov.collectMsg ? '<p style="margin-top:10px;font-size:12px;color:var(--cream-soft);">' + escapeHtml(ov.collectMsg) + '</p>' : '') +
+      (ov.collectMsg ? '<p style="margin-top:10px;font-size:14px;color:var(--cream-soft);">' + escapeHtml(ov.collectMsg) + '</p>' : '') +
       '</div>';
 
     html += '<div class="acct-block">' +
@@ -1649,12 +1659,12 @@
       html += '<button class="btn" id="opn-cluster-btn" style="margin-bottom:8px;" ' + (ov.clusterLoading?'disabled':'') + '>' +
         (ov.clusterLoading ? '입장 분류하는 중...' : (issue.groups && issue.groups.length ? '다시 분류하기' : '입장별로 자동 분류하기')) +
       '</button>';
-      if (ov.clusterMsg) html += '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 16px;">' + escapeHtml(ov.clusterMsg) + '</p>';
+      if (ov.clusterMsg) html += '<p style="font-size:14px;color:var(--cream-soft);margin:0 0 16px;">' + escapeHtml(ov.clusterMsg) + '</p>';
     }
 
     // --- visualization (grouped) or flat list ---
     if (issue.groups && issue.groups.length){
-      html += '<p class="section-title">입장별 분포</p>';
+      html += '<p class="section-title" style="margin-top:30px;">입장별 분포</p>';
       var total = issue.opinions.length;
       var byId = {};
       issue.opinions.forEach(function(o){ byId[o.id] = o; });
@@ -1662,7 +1672,7 @@
         var pct = total ? Math.round((g.opinionIds.length/total)*1000)/10 : 0;
         var color = opinionColorForIndex(i);
         html += '<div class="opn-group">' +
-          '<div class="opn-group-head"><span class="opn-group-label" style="color:' + color + ';">' + escapeHtml(g.label) + '</span><span class="opn-group-pct">' + pct + '% · ' + g.opinionIds.length + '개</span></div>' +
+          '<div class="opn-group-head"><span class="opn-group-label"><i style="background:' + color + ';"></i>' + escapeHtml(g.label) + '</span><span class="opn-group-pct">' + pct + '% · ' + g.opinionIds.length + '개</span></div>' +
           '<div class="opn-bar-bg"><div class="opn-bar" style="width:' + pct + '%;background:' + color + ';"></div></div>';
         g.opinionIds.forEach(function(oid){
           var o = byId[oid];
@@ -2136,7 +2146,7 @@
     var maxAbs = Math.max.apply(null, CRITERIA.map(function(c){ return Math.abs(state.weights[c.key]||0); }).concat([0.001]));
     var sorted = CRITERIA.slice().sort(function(a,b){ return (state.weights[b.key]||0) - (state.weights[a.key]||0); });
     if (state.trained === 0){
-      html += '<p style="font-size:13px;color:var(--cream-soft);">아직 학습된 데이터가 없어요. 카드 평가나 상대 비교를 진행하면 이곳에 당신의 기준이 나타납니다.</p>';
+      html += '<p style="font-size:15px;color:var(--cream-soft);">아직 학습된 데이터가 없어요. 카드 평가나 상대 비교를 진행하면 이곳에 당신의 기준이 나타납니다.</p>';
     } else {
       sorted.forEach(function(c){
         var w = state.weights[c.key]||0;
@@ -2171,19 +2181,19 @@
   function settingsTabHtml(){
     var html = '<p class="section-title">AI 연동</p>';
     html += '<div class="acct-block"><div class="acct-label">검색·채점 엔진</div>' +
-      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">Tavily 검색은 별도 프록시 서버를 거쳐서 동작하고, Gemini 채점·요약은 이 사이트 전용으로 제한된 키를 통해 바로 동작해요. 둘 다 이 계정으로 로그인한 사람이라면 별도 키 등록 없이 바로 "키워드 자동 수집", "AI 자동 채점", "AI 요약"을 쓸 수 있어요.</p></div>';
+      '<p style="font-size:14px;color:var(--cream-soft);margin:0 0 12px;">Tavily 검색은 별도 프록시 서버를 거쳐서 동작하고, Gemini 채점·요약은 이 사이트 전용으로 제한된 키를 통해 바로 동작해요. 둘 다 이 계정으로 로그인한 사람이라면 별도 키 등록 없이 바로 "키워드 자동 수집", "AI 자동 채점", "AI 요약"을 쓸 수 있어요.</p></div>';
 
     var gs = state.geminiSettings || { model: 'gemini-2.5-flash' };
     html += '<div class="acct-block"><div class="acct-label">Gemini 모델 선택</div>' +
-      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 12px;">AI 채점·AI 요약에서 Gemini 엔진을 고르면 이 모델이 사용됩니다. 서버에 등록된 키로 실제 사용 가능한 모델 목록을 불러올 수 있어요.</p>' +
+      '<p style="font-size:14px;color:var(--cream-soft);margin:0 0 12px;">AI 채점·AI 요약에서 Gemini 엔진을 고르면 이 모델이 사용됩니다. 서버에 등록된 키로 실제 사용 가능한 모델 목록을 불러올 수 있어요.</p>' +
       '<div class="field"><label>모델명</label><input type="text" id="settings-gemini-model" placeholder="gemini-2.5-flash" value="' + escapeHtml(gs.model||'gemini-2.5-flash') + '" /></div>' +
       '<button class="btn ghost small" id="gemini-list-models" style="margin-bottom:12px;" ' + (state.geminiModelListLoading?'disabled':'') + '>' + (state.geminiModelListLoading ? '불러오는 중...' : '사용 가능한 모델 확인') + '</button>';
 
     if (state.geminiModelList){
       if (state.geminiModelList.length === 0){
-        html += '<p style="font-size:12px;color:var(--reject);margin:-6px 0 12px;">서버에 등록된 키로 사용 가능한 생성 모델이 없어요. 관리자에게 문의해주세요.</p>';
+        html += '<p style="font-size:14px;color:var(--reject);margin:-6px 0 12px;">서버에 등록된 키로 사용 가능한 생성 모델이 없어요. 관리자에게 문의해주세요.</p>';
       } else {
-        html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;font-family:var(--font-mono);color:var(--cream-soft);margin-bottom:6px;">사용 가능한 모델 (' + state.geminiModelList.length + '개) — 클릭해서 선택</div>' +
+        html += '<div style="font-size:13px;text-transform:uppercase;letter-spacing:0.05em;font-family:var(--font-mono);color:var(--cream-soft);margin-bottom:6px;">사용 가능한 모델 (' + state.geminiModelList.length + '개) — 클릭해서 선택</div>' +
           '<div class="model-list">' +
           state.geminiModelList.map(function(m){
             var active = gs.model === m.name;
@@ -2204,7 +2214,7 @@
     html += '<p class="section-title">데이터 관리</p><button class="btn ghost small" id="reset-all">모든 데이터 초기화</button>';
 
     html += '<p class="section-title">계정 관리</p>';
-    html += '<div style="font-size:12px;color:var(--cream-soft);margin-bottom:14px;">현재 로그인: <b style="color:var(--gold);">' + escapeHtml(state.user ? state.user.email : '') + '</b></div>';
+    html += '<div style="font-size:14px;color:var(--cream-soft);margin-bottom:14px;">현재 로그인: <b style="color:var(--gold);">' + escapeHtml(state.user ? state.user.email : '') + '</b></div>';
 
     html += '<div class="acct-block"><div class="acct-label">이메일 변경</div>' +
       '<div class="field"><label>새 이메일</label><input type="text" id="acct-new-email" placeholder="new@example.com" /></div>' +
@@ -2219,7 +2229,7 @@
       '<button class="btn ghost small" id="acct-pw-submit" ' + (state.acctPwLoading?'disabled':'') + '>' + (state.acctPwLoading ? '처리 중...' : '비밀번호 변경하기') + '</button></div>';
 
     html += '<div class="acct-block acct-danger"><div class="acct-label" style="color:var(--reject);">회원 탈퇴</div>' +
-      '<p style="font-size:12px;color:var(--cream-soft);margin:0 0 10px;">계정과 함께 저장된 모든 자료·학습 데이터가 영구히 삭제됩니다.</p>' +
+      '<p style="font-size:14px;color:var(--cream-soft);margin:0 0 10px;">계정과 함께 저장된 모든 자료·학습 데이터가 영구히 삭제됩니다.</p>' +
       '<div class="field"><label>현재 비밀번호</label><input type="password" id="acct-del-pw" /></div>' +
       (state.acctDeleteMsg ? '<p class="acct-msg ' + state.acctDeleteMsg.type + '">' + escapeHtml(state.acctDeleteMsg.text) + '</p>' : '') +
       '<button class="btn ghost small" id="acct-delete-submit" style="border-color:var(--reject);color:var(--reject);" ' + (state.acctDeleteLoading?'disabled':'') + '>' + (state.acctDeleteLoading ? '처리 중...' : '계정 영구 삭제') + '</button></div>';
