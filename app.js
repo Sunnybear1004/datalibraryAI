@@ -37,6 +37,7 @@
     menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>',
     chevDown: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     opinions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5h16v10H9l-5 4V5z"/><path d="M8 9h8M8 12h5"/></svg>',
+    bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16z" stroke-linejoin="round"/><path d="M10 20a2 2 0 0 0 4 0" stroke-linecap="round"/></svg>',
     help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M9.4 9.3a2.7 2.7 0 1 1 3.9 2.4c-.9.5-1.3 1-1.3 2" stroke-linecap="round"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/></svg>'
   };
 
@@ -60,8 +61,105 @@
         { id:'profile', label:'성향 분석' }
     ]},
     { id:'settings', label:'설정', icon: ICONS.settings },
+    { id:'updates', label:'업데이트 기록', icon: ICONS.bell },
     { id:'help', label:'도움말', icon: ICONS.help }
   ];
+
+  // ---- 업데이트 기록 ----
+  // Newest first. When shipping a change: add an entry at the TOP and bump
+  // APP_VERSION to its v. Users who have not seen it get a popup on next load.
+  var APP_VERSION = '1.12';
+  var CHANGELOG = [
+    { v: '1.12', date: '2026-10-28', title: '긴급 공지',
+      items: ['관리자가 <b>긴급 공지</b>를 올리면 지금 접속해 있는 사람에게도 새로고침 없이 바로 팝업이 떠요.'] },
+    { v: '1.11', title: '관리자 모드 · 공지 · AI 사용 한도',
+      items: [
+        '<b>공지</b>: 관리자가 올린 공지가 접속할 때 팝업으로 떠요.',
+        '<b>AI 사용 한도</b>: 관리자가 하루 AI 사용 횟수를 정해 둘 수 있어요. 한도에 닿으면 AI 기능이 그날은 멈추고, 설정 → AI 사용량에서 남은 횟수를 볼 수 있어요.',
+        '<b>개인정보 안내</b>: 서비스 운영과 문제 해결을 위해 관리자는 사용 현황(자료 수, AI 사용량, 마지막 접속)을 볼 수 있고, 꼭 필요할 때는 자료·평가 기록도 열람할 수 있어요. 이메일은 관리자 화면에도 나오지 않아요.'
+      ] },
+    { v: '1.10', title: '새 버전 자동 새로고침',
+      items: [
+        '새 버전이 올라오면 <b>알림이 뜨고, 하던 일이 끝난 뒤 자동으로 새로고침</b>돼요. 새로고침을 직접 하지 않아도 최신 버전을 쓸 수 있어요.',
+        'AI가 일하는 중이거나 입력 중일 때는 기다렸다가 바꿔요. 새로고침 전에 저장도 마쳐요.'
+      ] },
+    { v: '1.9', title: '점수 다시 매기기 · 업데이트 기록',
+      items: [
+        '<b>점수 다시 매기기</b>: 예전 채점 기준으로 높게 매겨진 자료를 지금 기준으로 AI가 다시 채점해요 (설정 → 데이터 관리). 대상과 예상 토큰을 보고 고를 수 있어요.',
+        '<b>내 기준 다시 학습</b>: 지금까지의 승인·반려 기록을 새 점수로 처음부터 다시 배워요. 토큰이 들지 않아요.',
+        '<b>업데이트 기록</b>: 새 버전이 나오면 접속할 때 변경 내용을 알려주고, 메뉴에서 지난 기록도 볼 수 있어요.'
+      ] },
+    { v: '1.8', title: '분야별 취향 학습',
+      items: [
+        '분야마다 내 취향을 따로 배워요. 과학은 어려운 자료도 좋아하고 사회는 쉬운 자료를 좋아하는 식으로, <b>한 분야의 평가가 다른 분야의 추천을 망치지 않아요.</b>',
+        '성향 분석에서 분야를 골라 그 분야의 내 기준을 따로 볼 수 있어요.'
+      ] },
+    { v: '1.7', title: 'AI 예측 적중률 · 토큰 절약',
+      items: [
+        '성향 분석에 <b>AI 예측 적중률</b>이 생겼어요. 프로그램이 예측한 값과 내 실제 결정이 얼마나 맞았는지 보여줘요.',
+        'AI에는 짧은 요약만 보내고 점수는 숫자로만 받아서 <b>토큰 사용량이 크게 줄었어요.</b> 설정에서 오늘/누적 사용량을 볼 수 있어요.',
+        '자주 반려한 출처는 AI에 묻지 않고 먼저 제외해요.'
+      ] },
+    { v: '1.6', title: '저장 용량 제한 해제',
+      items: ['자료가 많아져도 저장이 막히지 않도록 자료를 여러 쪽으로 나눠 저장해요. 설정에서 저장 용량을 볼 수 있어요.'] },
+    { v: '1.5', title: '공유 링크 · 그룹',
+      items: [
+        '승인·반려 자료함에서 자료를 골라 <b>공유 링크</b>(로그인 없이 읽기 전용)를 만들 수 있어요.',
+        '학급·동아리용 <b>그룹</b>을 만들고 코드로 참여해 자료를 모을 수 있어요. 친구가 넣은 자료는 <b>내 서고에 담기</b>로 가져와 직접 평가해요.'
+      ] },
+    { v: '1.0', title: '기본 기능',
+      items: [
+        '카드 평가(오른쪽 적절 · 왼쪽 반려), 자료 추가, 대량 추가(URL 목록 · 무분별 수집 · 분별 수집), 의견 수집',
+        '승인·반려 자료함, 상대 비교, 성향 분석과 성향 공유',
+        '9가지 평가 기준, 처음 안내(튜토리얼)와 도움말'
+      ] }
+  ];
+  function changelogIndex(v){
+    for (var i = 0; i < CHANGELOG.length; i++) if (CHANGELOG[i].v === v) return i;
+    return -1;
+  }
+  // entries the user has not seen yet (newest first); unknown/missing => latest 3
+  function unseenChangelog(seen){
+    var idx = changelogIndex(seen);
+    if (idx === 0) return [];
+    if (idx > 0) return CHANGELOG.slice(0, idx);
+    return CHANGELOG.slice(0, 3);
+  }
+  function changelogEntryHtml(e, open, isNew){
+    return '<details class="help-acc"' + (open ? ' open' : '') + '><summary>v' + e.v + ' · ' + e.title +
+      (isNew ? ' <b style="color:var(--gold);font-size:12.5px;margin-left:6px;">NEW</b>' : '') +
+      (e.date ? ' <span style="color:var(--cream-soft);font-size:13px;margin-left:6px;">' + e.date + '</span>' : '') + '</summary>' +
+      '<div class="help-body"><ul style="margin:0;padding-left:20px;">' + e.items.map(function(t){ return '<li style="margin-bottom:6px;">' + t + '</li>'; }).join('') + '</ul></div></details>';
+  }
+  function updatesTabHtml(){
+    var newCount = unseenChangelog(state.seenVersion).length;
+    return '<p class="section-title">업데이트 기록</p>' +
+      '<p class="help-lead">현재 버전은 <b>v' + APP_VERSION + '</b>이에요. 새 기능이 생기거나 고쳐지면 여기에 기록돼요.</p>' +
+      annBoxHtml() +
+      '<div style="margin-bottom:28px;">' + CHANGELOG.map(function(e, i){ return changelogEntryHtml(e, i === 0, state.updateNew && state.updateNew.indexOf(e.v) !== -1); }).join('') + '</div>';
+  }
+  function updatePopupHtml(){
+    var list = state.updatePopup || [];
+    return '<div class="modal-overlay" id="upd-overlay" style="z-index:60;"><div class="modal tut-modal" role="dialog" aria-modal="true">' +
+      '<button type="button" class="tut-close" id="upd-close-x" aria-label="닫기">' + ICONS.x + '</button>' +
+      '<div class="tut-count">UPDATE · v' + APP_VERSION + '</div>' +
+      '<h3 style="margin-top:12px;">새로 바뀐 점</h3>' +
+      '<div class="tut-body" style="min-height:0;max-height:55vh;overflow-y:auto;">' +
+        list.map(function(e){
+          return '<p style="margin:14px 0 6px;"><b>v' + e.v + ' · ' + e.title + '</b>' + (e.date ? ' <span class="tut-hint">' + e.date + '</span>' : '') + '</p>' +
+            '<ul>' + e.items.map(function(t){ return '<li>' + t + '</li>'; }).join('') + '</ul>';
+        }).join('') +
+      '</div>' +
+      '<div class="tut-actions" style="margin-top:18px;"><button type="button" class="tut-skip" id="upd-all">지난 기록 모두 보기</button>' +
+      '<div class="right"><button type="button" class="btn small" id="upd-ok">확인</button></div></div>' +
+      '</div></div>';
+  }
+  function dismissUpdatePopup(goAll){
+    state.updatePopup = null;
+    state.seenVersion = APP_VERSION;
+    persistAppData();
+    if (goAll) goTab('updates'); else render();
+  }
 
   function uid(){ return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
@@ -124,6 +222,8 @@
   }
 
   function geminiFetch(prompt, model, jsonMode, allowThinking){
+    var limitMsg = aiLimitReason();
+    if (limitMsg) return Promise.reject(new Error(limitMsg));
     var useThinkCfg = !allowThinking && !noThinkCfg[model];
     var body = { contents: [{ parts: [{ text: prompt }] }] };
     var gc = {};
@@ -314,6 +414,8 @@
       sharing: state.sharing,
       importedProfiles: state.importedProfiles,
       tutorialDone: state.tutorialDone,
+      seenVersion: state.seenVersion,
+      seenAnnouncement: state.seenAnnouncement,
       sharedLinks: state.sharedLinks,
       displayName: state.displayName,
       aiUsage: state.aiUsage,
@@ -324,7 +426,7 @@
     publishSharedProfile().catch(function(){});
     batch.set(appDataDocRef(uidAtCallTime), payload);
     currentSavePromise = batch.commit()
-      .then(function(){ pageCache.materials = mq.jsons; pageCache.issues = iq.jsons; })
+      .then(function(){ pageCache.materials = mq.jsons; pageCache.issues = iq.jsons; touchUserIndex(false); })
       .catch(function(e){ showToast('저장에 실패했어요. 네트워크 연결을 확인해주세요.'); })
       .then(function(){
         savingInFlight = false;
@@ -390,6 +492,9 @@
     tutorialOpen: false, tutorialStep: 0, tutorialDone: false,
     apv: { q: '', field: 'all', sort: 'recent' },
     fieldModel: {}, profileField: 'all',
+    seenVersion: null, updatePopup: null, updateNew: null,
+    isAdmin: false, announcement: null, annPopup: null, seenAnnouncement: null, limits: { def: null, mine: null },
+    admin: { sub: 'stats', users: null, userLimits: {}, loadingUsers: false, userErr: null, detail: null, groups: null, links: null, loadingGl: false, glErr: null, msg: null, annTitle: '', annBody: '', annUrgent: false, busy: false },
     retrainMsg: null,
     rescore: { scope: 'old', retrain: true, busy: false, done: 0, total: 0, msg: null },
     sel: {}, selVisible: [], shareModal: null,
@@ -449,9 +554,11 @@
       state.sharedLinks = []; state.displayName = ''; state.aiUsage = null; state.fieldModel = {};
       normalizeCriteriaData();
       state.tutorialDone = false; state.tutorialOpen = true; state.tutorialStep = 0;
+      state.seenVersion = APP_VERSION;   // nothing is "new" to a brand-new account
       state.loaded = true;
       render();
       persistAppData(); // background save, no need to make the user wait
+      afterLoadHooks();
       return;
     }
 
@@ -492,6 +599,8 @@
       state.sharing = data.sharing || { code: null, nickname: '', includeTitles: true };
       state.importedProfiles = data.importedProfiles || [];
       state.tutorialDone = data.tutorialDone === true;
+      state.seenVersion = typeof data.seenVersion === 'string' ? data.seenVersion : null;
+      state.seenAnnouncement = typeof data.seenAnnouncement === 'string' ? data.seenAnnouncement : null;
       state.sharedLinks = Array.isArray(data.sharedLinks) ? data.sharedLinks : [];
       state.displayName = typeof data.displayName === 'string' ? data.displayName : '';
       state.aiUsage = (data.aiUsage && typeof data.aiUsage === 'object') ? data.aiUsage : null;
@@ -505,7 +614,7 @@
       state.sharing = { code: null, nickname: '', includeTitles: true };
       state.importedProfiles = [];
       state.sharedLinks = []; state.displayName = ''; state.aiUsage = null; state.fieldModel = {};
-      state.tutorialDone = false;
+      state.tutorialDone = false; state.seenVersion = APP_VERSION;
       state.loaded = true;
       persistAppData();
     }
@@ -515,10 +624,16 @@
     if (!state.fieldModel) rebuilt = rebuildFieldModel();   // older account: derive field offsets from past decisions
     state.profileField = 'all';
     state.tutorialOpen = !state.tutorialDone; state.tutorialStep = 0;
+    // first load after a new deploy: tell the user what changed (not while the first-run tutorial is showing)
+    var unseen = unseenChangelog(state.seenVersion);
+    state.updateNew = unseen.map(function(e){ return e.v; });
+    if (state.tutorialDone && unseen.length) state.updatePopup = unseen;
+    else if (!state.tutorialDone) state.seenVersion = APP_VERSION;
     state.loaded = true;
     render();
     if (rebuilt) persistAppData();
     if (data && !(data.paged && data.paged.v === 2)) persistAppData();   // one-time move to the paged layout
+    afterLoadHooks();
   }
 
   async function saveMaterials(){ return persistAppData(); }
@@ -772,12 +887,17 @@
     else if (state.tab === 'compare') html += compareTabHtml(approved);
     else if (state.tab === 'profile') html += profileTabHtml(approved, rejected, pending);
     else if (state.tab === 'settings') html += settingsTabHtml();
+    else if (state.tab === 'updates') html += updatesTabHtml();
+    else if (state.tab === 'admin') html += adminTabHtml();
     else if (state.tab === 'help') html += helpTabHtml();
     html += '</div>';
     if (state.pendingReject) html += reasonModalHtml();
     if (state.shareModal) html += shareModalHtml();
     if (state.menuOpen) html += menuDrawerHtml();
-    if (state.tutorialOpen) html += tutorialHtml();
+    if (state.annPopup && state.annPopup.level === 'urgent') html += annPopupHtml();
+    else if (state.tutorialOpen) html += tutorialHtml();
+    else if (state.updatePopup) html += updatePopupHtml();
+    else if (state.annPopup) html += annPopupHtml();
     if (state.toast) html += '<div class="toast" id="toast-el">' + escapeHtml(state.toast) + '</div>';
 
     app.innerHTML = html;
@@ -832,7 +952,7 @@
           '<span class="menu-drawer-title">메뉴</span>' +
           '<button type="button" class="menu-close-btn" id="menu-close-btn">' + ICONS.x + '</button>' +
         '</div>';
-    MENU.forEach(function(entry){
+    MENU.concat(state.isAdmin ? [{ id:'admin', label:'관리자', icon: ICONS.settings }] : []).forEach(function(entry){
       if (entry.children){
         var hasActive = entry.children.some(function(c){ return c.id === state.tab; });
         var open = state.menuExpanded[entry.key] !== false;
@@ -2126,7 +2246,7 @@
       ['카드 평가에 카드가 없다고 나와요', '평가할 자료가 없는 상태예요. <b>자료 추가</b>나 <b>대량 추가</b>에서 자료를 먼저 등록해 주세요.'],
       ['성향 분석이 비어 있어요', '카드를 평가해야 내 기준이 쌓여요. 처음에는 점수 차이가 작을 수 있으니 카드를 여러 장(10장 이상) 평가해 보세요.'],
       ['수집이나 AI 점수 매기기가 안 돼요', '하루에 쓸 수 있는 AI·검색 횟수에는 한도가 있어요. 한도 오류라면 시간이 지난 뒤 다시 하거나, <b>설정</b>에서 다른 AI 모델을 골라 "연결 테스트"를 해 보세요.'],
-      ['내 자료를 다른 사람이 볼 수 있나요?', '내가 직접 공유하기 전에는 아니에요. 자료와 평가 기록은 내 계정에만 저장돼요. 공유 링크나 그룹에 넣은 자료, 성향 공유로 내보낸 내용만 상대가 볼 수 있고, 이메일은 어디에도 공유되지 않아요. 공유 링크는 "공유 · 그룹" 메뉴에서 언제든 중단할 수 있어요.']
+      ['내 자료를 다른 사람이 볼 수 있나요?', '다른 사용자는 내가 직접 공유하기 전에는 볼 수 없어요. 공유 링크나 그룹에 넣은 자료, 성향 공유로 내보낸 내용만 상대가 볼 수 있고, 이메일은 어디에도 공유되지 않아요. 공유 링크는 "공유 · 그룹" 메뉴에서 언제든 중단할 수 있어요. 다만 <b>서비스를 운영하고 문제를 해결하기 위해 관리자는</b> 사용 현황(자료 수, AI 사용량, 마지막 접속)을 볼 수 있고, 꼭 필요할 때는 자료·평가 기록도 열람할 수 있어요.']
     ];
     var faqHtml = faq.map(function(g){
       return '<details class="help-acc"><summary>' + g[0] + '</summary><div class="help-body">' + g[1] + '</div></details>';
@@ -3283,6 +3403,7 @@
     var fmtTok = function(n){ return n >= 10000 ? (n / 1000).toFixed(0) + 'K' : String(n); };
     html += '<div class="acct-block"><div class="acct-label">AI 사용량 (토큰)</div>' +
       '<p style="font-size:14.5px;line-height:1.7;color:var(--cream-soft);margin:0 0 8px;">오늘 <b style="color:var(--cream);">' + au.calls + '회</b> 호출 · 약 <b style="color:var(--cream);">' + fmtTok(au.tokens) + '</b> 토큰 / 지금까지 ' + au.totalCalls + '회 · ' + fmtTok(au.totalTokens) + ' 토큰</p>' +
+      limitLineHtml() +
       '<p class="sm-hint" style="margin:0;">토큰을 아끼도록 AI에는 짧은 요약만 보내고 점수는 숫자로만 받아요. 자주 반려한 출처는 AI에 묻지 않고 먼저 제외하고, 적중률 계산·카드 학습·상대 비교는 AI 없이 처리해요. 수집 개수를 필요한 만큼만 정하면 더 아낄 수 있어요.</p></div>';
 
     var gs = state.geminiSettings || { model: 'gemini-2.5-flash' };
@@ -3353,6 +3474,7 @@
     state.tab = t; state.menuOpen = false;
     render();
     if (t === 'share') loadGroups(false);
+    if (t === 'admin' && state.isAdmin) adminEnter();
   }
   function attachHandlers(pending, approved, rejected){
     document.querySelectorAll('[data-goto]').forEach(function(btn){
@@ -4028,6 +4150,19 @@
     if (rejFilterEl) rejFilterEl.addEventListener('change', function(){ state.rejFilter = rejFilterEl.value; render(); });
 
     attachShareHandlers();
+    attachAdminHandlers();
+
+    // update popup
+    var updOk = document.getElementById('upd-ok');
+    if (updOk) updOk.addEventListener('click', function(){ dismissUpdatePopup(false); });
+    var updX = document.getElementById('upd-close-x');
+    if (updX) updX.addEventListener('click', function(){ dismissUpdatePopup(false); });
+    var updAll = document.getElementById('upd-all');
+    if (updAll) updAll.addEventListener('click', function(){ dismissUpdatePopup(true); });
+    if (!window.__updKeysBound){
+      window.__updKeysBound = true;
+      document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && state.updatePopup && !state.tutorialOpen) dismissUpdatePopup(false); });
+    }
 
     // tutorial + help
     function tutGo(n){ state.tutorialStep = Math.max(0, Math.min(TUTORIAL_STEPS.length - 1, n)); render(); }
@@ -4301,6 +4436,8 @@
       reauthenticate(pw).then(function(){
         return cleanupSharedDocs();
       }).then(function(){
+        return fbDb.collection('user_index').doc(uidToDelete).delete().catch(function(){});
+      }).then(function(){
         return fbDb.collection('users').doc(uidToDelete).collection('store').get();
       }).then(function(snap){
         var batch = fbDb.batch();
@@ -4352,6 +4489,9 @@
       saveDirty = false;
       pageCache = {};
       currentSavePromise = Promise.resolve();
+      stopAnnouncementWatch();
+      state.isAdmin = false; state.announcement = null; state.annPopup = null; state.limits = { def: null, mine: null };
+      state.admin.users = null; state.admin.detail = null; state.admin.groups = null; state.admin.links = null; state.admin.msg = null; state.admin.sub = 'stats';
       if (user){
         state.user = { uid: user.uid, email: user.email };
         state.authError = null;
@@ -4371,5 +4511,531 @@
     });
   }
 
+  // ---- 관리자 모드 / 공지 / AI 한도 ----
+  // Security lives in the Firestore rules (admins/{uid} must exist); the UI here only
+  // reflects it. AI limits are enforced in this browser, so they are a soft limit.
+  function adminFmt(ts){
+    if (!ts) return '-';
+    var d = new Date(ts);
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  function adminErrMsg(err){
+    if (err && err.code === 'permission-denied') return '권한이 없어요. Firestore 규칙과 관리자 등록(admins 문서)을 확인해주세요.';
+    return (err && err.message) || '오류가 났어요.';
+  }
+  function userLabel(u){ return (u.name && String(u.name).trim()) ? String(u.name).trim() : ('이름 없음 · ' + String(u.id || '').slice(0, 6)); }
+  function usageToday(u){ var x = u && u.usage; return (x && x.day === todayKey()) ? x : { calls: 0, tokens: 0 }; }
+
+  function effectiveDailyLimit(){
+    var mine = state.limits.mine || {};
+    if (typeof mine.dailyCalls === 'number' && mine.dailyCalls >= 0) return mine.dailyCalls;
+    var d = state.limits.def || {};
+    return (typeof d.dailyCalls === 'number' && d.dailyCalls > 0) ? d.dailyCalls : null;
+  }
+  function aiLimitReason(){
+    if (state.isAdmin) return null;
+    var mine = state.limits.mine || {};
+    if (mine.blocked) return '관리자가 이 계정의 AI 사용을 잠시 막아 두었어요.';
+    var lim = effectiveDailyLimit();
+    if (lim === null) return null;
+    var u = state.aiUsage;
+    var used = (u && u.day === todayKey()) ? u.calls : 0;
+    if (used >= lim) return '오늘 AI 사용 한도(' + lim + '회)에 도달했어요. 내일 다시 쓸 수 있어요.';
+    return null;
+  }
+  function limitLineHtml(){
+    if (state.isAdmin) return '<p class="sm-hint" style="margin:0 0 8px;">관리자 계정은 AI 사용 한도가 적용되지 않아요.</p>';
+    var mine = state.limits.mine || {};
+    if (mine.blocked) return '<p class="sm-hint" style="margin:0 0 8px;color:var(--reject);">관리자가 이 계정의 AI 사용을 잠시 막아 두었어요.</p>';
+    var lim = effectiveDailyLimit();
+    if (lim === null) return '';
+    var u = state.aiUsage;
+    var used = (u && u.day === todayKey()) ? u.calls : 0;
+    return '<p class="sm-hint" style="margin:0 0 8px;">관리자가 정한 하루 한도: <b>' + lim + '회</b> · 오늘 남은 횟수 <b>' + Math.max(0, lim - used) + '회</b></p>';
+  }
+
+  var userIndexAt = 0;
+  // Counts only (no titles, no email): lets the admin see who is using the app and how much.
+  function touchUserIndex(force){
+    if (!state.user || !state.loaded || typeof fbDb === 'undefined' || !fbDb) return;
+    var now = Date.now();
+    if (!force && now - userIndexAt < 60000) return;
+    userIndexAt = now;
+    var a = 0, r = 0, pn = 0;
+    state.materials.forEach(function(m){ if (m.status === 'approved') a++; else if (m.status === 'rejected') r++; else pn++; });
+    var u = state.aiUsage || {};
+    var doc = {
+      name: (state.displayName || '').slice(0, 30),
+      counts: { a: a, r: r, p: pn }, total: state.materials.length,
+      usage: { day: u.day || null, calls: u.calls || 0, tokens: u.tokens || 0, totalCalls: u.totalCalls || 0, totalTokens: u.totalTokens || 0 },
+      links: (state.sharedLinks || []).length, ver: APP_VERSION, lastSeen: now
+    };
+    try { fbDb.collection('user_index').doc(state.user.uid).set(doc).catch(function(){}); } catch(e){}
+  }
+
+  var flagsAt = 0;
+  // Live: an urgent announcement pops up right away for people who are already using the app;
+  // a normal one just waits for their next visit.
+  var annUnsub = null, annFirst = true;
+  function stopAnnouncementWatch(){ if (annUnsub){ try { annUnsub(); } catch(e){} annUnsub = null; } annFirst = true; }
+  function handleAnnouncement(a, initial){
+    state.announcement = a || null;
+    var show = !!(a && a.active && a.id && a.id !== state.seenAnnouncement && (initial || a.level === 'urgent'));
+    if (show){ state.annPopup = a; render(); }
+    else if (!initial && (state.tab === 'updates' || state.tab === 'admin')) render();
+  }
+  function watchAnnouncement(){
+    var ref = fbDb.collection('config').doc('announcement');
+    if (typeof ref.onSnapshot !== 'function'){
+      return ref.get().then(function(sn){ state.announcement = sn.exists ? sn.data() : null; }).catch(function(){});
+    }
+    if (annUnsub) return Promise.resolve();
+    return new Promise(function(resolve){
+      var first = true;
+      try {
+        annUnsub = ref.onSnapshot(function(sn){
+          var init = first; first = false;
+          if (init){ state.announcement = sn.exists ? sn.data() : null; resolve(); }
+          else handleAnnouncement(sn.exists ? sn.data() : null, false);
+        }, function(){ resolve(); });
+      } catch(e){ resolve(); }
+    });
+  }
+  function loadAccessFlags(){
+    if (!state.user) return Promise.resolve();
+    var uid0 = state.user.uid;
+    flagsAt = Date.now();
+    var jobs = [
+      fbDb.collection('admins').doc(uid0).get().then(function(sn){ state.isAdmin = !!sn.exists; }).catch(function(){}),
+      watchAnnouncement(),
+      fbDb.collection('config').doc('limits').get().then(function(sn){ state.limits.def = sn.exists ? sn.data() : null; }).catch(function(){}),
+      fbDb.collection('user_limits').doc(uid0).get().then(function(sn){ state.limits.mine = sn.exists ? sn.data() : null; }).catch(function(){})
+    ];
+    return Promise.all(jobs).then(function(){
+      if (!state.user || state.user.uid !== uid0) return;
+      var a = state.announcement;
+      if (a && a.active && a.id && a.id !== state.seenAnnouncement && !state.annPopup) state.annPopup = a;
+      render();
+    });
+  }
+  function afterLoadHooks(){
+    touchUserIndex(true);
+    loadAccessFlags();
+  }
+
+  function annTextHtml(t){ return escapeHtml(t || '').replace(/\n/g, '<br>'); }
+  function annPopupHtml(){
+    var a = state.annPopup || {};
+    var urgent = a.level === 'urgent';
+    return '<div class="modal-overlay" id="ann-overlay" style="z-index:' + (urgent ? 80 : 60) + ';"><div class="modal tut-modal" role="alertdialog" aria-modal="true"' + (urgent ? ' style="border-top:6px solid #B3402A;"' : '') + '>' +
+      '<button type="button" class="tut-close" id="ann-close-x" aria-label="닫기">' + ICONS.x + '</button>' +
+      '<div class="tut-count"' + (urgent ? ' style="color:#B3402A;font-weight:700;"' : '') + '>' + (urgent ? '긴급 공지' : '공지') + '</div>' +
+      '<h3 style="margin-top:12px;">' + escapeHtml(a.title || '공지') + '</h3>' +
+      '<div class="tut-body" style="min-height:0;max-height:55vh;overflow-y:auto;">' + annTextHtml(a.body) + '</div>' +
+      '<div class="tut-actions" style="margin-top:18px;"><span></span><div class="right"><button type="button" class="btn small" id="ann-ok">확인</button></div></div>' +
+      '</div></div>';
+  }
+  function annBoxHtml(){
+    var a = state.announcement;
+    if (!a || !a.active) return '';
+    return '<div class="acct-block" style="margin-bottom:18px;"><div class="acct-label">' + (a.level === 'urgent' ? '긴급 ' : '') + '현재 공지 · ' + escapeHtml(a.title || '') + '</div>' +
+      '<p style="font-size:15px;line-height:1.7;color:var(--cream);margin:0;">' + annTextHtml(a.body) + '</p></div>';
+  }
+  function dismissAnn(){
+    var a = state.annPopup;
+    state.annPopup = null;
+    if (a && a.id){ state.seenAnnouncement = a.id; persistAppData(); }
+    render();
+  }
+
+  // ----- admin data actions -----
+  function adminEnter(){
+    var ad = state.admin;
+    if (!ad.users && !ad.loadingUsers) adminLoadUsers();
+  }
+  function adminLoadUsers(){
+    var ad = state.admin;
+    if (ad.loadingUsers) return;
+    ad.loadingUsers = true; ad.userErr = null; render();
+    Promise.all([fbDb.collection('user_index').get(), fbDb.collection('user_limits').get()]).then(function(res){
+      var users = [], lim = {};
+      res[0].forEach(function(d){ var x = d.data(); x.id = d.id; users.push(x); });
+      res[1].forEach(function(d){ lim[d.id] = d.data(); });
+      users.sort(function(a, b){ return (b.lastSeen || 0) - (a.lastSeen || 0); });
+      ad.users = users; ad.userLimits = lim; ad.loadingUsers = false; render();
+    }).catch(function(err){
+      ad.loadingUsers = false; ad.users = ad.users || []; ad.userErr = adminErrMsg(err); render();
+    });
+  }
+  function adminLoadUserData(uid0){
+    var ad = state.admin;
+    ad.detail = { uid: uid0, loading: true, err: null, mats: null, filter: 'all', msg: null };
+    render();
+    fbDb.collection('users').doc(uid0).collection('store').doc('app-data').get().then(function(snap){
+      if (!snap.exists) return [];
+      var d = snap.data();
+      if (d.paged && d.paged.v === 2) return loadPages(uid0, 'materials', d.paged.materials || 0);
+      return d.materials || [];
+    }).then(function(mats){
+      if (!ad.detail || ad.detail.uid !== uid0) return;
+      ad.detail.mats = mats; ad.detail.loading = false; render();
+    }).catch(function(err){
+      if (!ad.detail || ad.detail.uid !== uid0) return;
+      ad.detail.loading = false; ad.detail.err = adminErrMsg(err); render();
+    });
+  }
+  function adminSaveLimit(uid0){
+    var ad = state.admin;
+    var callsRaw = (document.getElementById('ad-lim-calls') || {}).value;
+    var blocked = !!(document.getElementById('ad-lim-block') || {}).checked;
+    var data = { blocked: blocked, updatedAt: Date.now() };
+    var n = parseInt(callsRaw, 10);
+    if (callsRaw !== '' && callsRaw != null){
+      if (isNaN(n) || n < 0 || n > 100000){ ad.msg = { type: 'err', text: '횟수는 0 이상의 숫자로 적어주세요.' }; render(); return; }
+      data.dailyCalls = n;
+    }
+    var ref = fbDb.collection('user_limits').doc(uid0);
+    var job = (!blocked && data.dailyCalls === undefined) ? ref.delete().then(function(){ delete ad.userLimits[uid0]; }) : ref.set(data).then(function(){ ad.userLimits[uid0] = data; });
+    job.then(function(){ ad.msg = { type: 'ok', text: '한도를 저장했어요.' }; render(); })
+       .catch(function(err){ ad.msg = { type: 'err', text: adminErrMsg(err) }; render(); });
+  }
+  function adminSaveDefault(){
+    var ad = state.admin;
+    var raw = (document.getElementById('ad-def-calls') || {}).value;
+    var n = parseInt(raw, 10);
+    var data = { updatedAt: Date.now(), dailyCalls: (raw === '' || isNaN(n) || n <= 0) ? null : n };
+    if (raw !== '' && (isNaN(n) || n < 0 || n > 100000)){ ad.msg = { type: 'err', text: '횟수는 숫자로 적어주세요.' }; render(); return; }
+    fbDb.collection('config').doc('limits').set(data).then(function(){
+      state.limits.def = data; ad.msg = { type: 'ok', text: data.dailyCalls ? ('기본 한도를 하루 ' + data.dailyCalls + '회로 정했어요.') : '기본 한도를 없앴어요.' }; render();
+    }).catch(function(err){ ad.msg = { type: 'err', text: adminErrMsg(err) }; render(); });
+  }
+  function adminPostAnn(){
+    var ad = state.admin;
+    var title = (document.getElementById('ad-ann-title') || {}).value || '';
+    var body = (document.getElementById('ad-ann-body') || {}).value || '';
+    title = title.trim().slice(0, 60); body = body.trim().slice(0, 1500);
+    if (!title || !body){ ad.msg = { type: 'err', text: '제목과 내용을 모두 적어주세요.' }; render(); return; }
+    var urgent = !!(document.getElementById('ad-ann-urgent') || {}).checked;
+    if (urgent && !confirm('긴급 공지는 지금 접속 중인 모든 사용자 화면에 바로 팝업으로 떠요. 올릴까요?')) return;
+    var data = { id: 'a' + Date.now().toString(36), title: title, body: body, active: true, level: urgent ? 'urgent' : 'normal', createdAt: Date.now() };
+    state.seenAnnouncement = data.id;   // set first: the live listener fires for my own write too
+    fbDb.collection('config').doc('announcement').set(data).then(function(){
+      state.announcement = data; persistAppData();
+      ad.annTitle = ''; ad.annBody = ''; ad.annUrgent = false; ad.msg = { type: 'ok', text: urgent ? '긴급 공지를 올렸어요. 접속 중인 사용자에게 바로 떠요.' : '공지를 올렸어요. 사용자는 다음에 접속할 때 보게 돼요.' }; render();
+    }).catch(function(err){ ad.msg = { type: 'err', text: adminErrMsg(err) }; render(); });
+  }
+  function adminClearAnn(){
+    var ad = state.admin;
+    var a = state.announcement;
+    if (!a) return;
+    var data = Object.assign({}, a, { active: false });
+    fbDb.collection('config').doc('announcement').set(data).then(function(){
+      state.announcement = data; ad.msg = { type: 'ok', text: '공지를 내렸어요.' }; render();
+    }).catch(function(err){ ad.msg = { type: 'err', text: adminErrMsg(err) }; render(); });
+  }
+  function adminLoadGl(){
+    var ad = state.admin;
+    if (ad.loadingGl) return;
+    ad.loadingGl = true; ad.glErr = null; render();
+    Promise.all([fbDb.collection('groups').get(), fbDb.collection('shared_collections').limit(100).get()]).then(function(res){
+      var gs = [], ls = [];
+      res[0].forEach(function(d){ var x = d.data(); x.code = d.id; gs.push(x); });
+      res[1].forEach(function(d){ var x = d.data(); x.code = d.id; ls.push(x); });
+      gs.sort(function(a, b){ return (b.createdAt || 0) - (a.createdAt || 0); });
+      ls.sort(function(a, b){ return (b.createdAt || 0) - (a.createdAt || 0); });
+      ad.groups = gs; ad.links = ls; ad.loadingGl = false; render();
+    }).catch(function(err){
+      ad.loadingGl = false; ad.groups = ad.groups || []; ad.links = ad.links || []; ad.glErr = adminErrMsg(err); render();
+    });
+  }
+  function adminDeleteGroup(code){
+    var ad = state.admin;
+    deleteGroupFully(code).then(function(){
+      ad.groups = (ad.groups || []).filter(function(g){ return g.code !== code; });
+      ad.msg = { type: 'ok', text: '그룹을 삭제했어요.' }; render();
+    }).catch(function(err){ ad.msg = { type: 'err', text: adminErrMsg(err) }; render(); });
+  }
+  function adminDeleteLink(code){
+    var ad = state.admin;
+    fbDb.collection('shared_collections').doc(code).delete().then(function(){
+      ad.links = (ad.links || []).filter(function(l){ return l.code !== code; });
+      ad.msg = { type: 'ok', text: '공유 링크를 중단했어요.' }; render();
+    }).catch(function(err){ ad.msg = { type: 'err', text: adminErrMsg(err) }; render(); });
+  }
+
+  // ----- admin UI -----
+  var AD_ROW = 'display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;width:100%;text-align:left;margin:0 0 8px;padding:12px 14px;';
+  function adminTabHtml(){
+    var ad = state.admin;
+    if (!state.isAdmin) return '<div class="empty"><h3>관리자만 볼 수 있어요</h3></div>';
+    var subs = [['stats', '현황'], ['users', '사용자'], ['ann', '공지'], ['groups', '그룹 · 링크']];
+    var html = '<p class="section-title">관리자</p>' +
+      '<div class="compare-controls"><div class="mode-toggle">' + subs.map(function(x){
+        return '<button data-adsub="' + x[0] + '" class="' + (ad.sub === x[0] ? 'active' : '') + '">' + x[1] + '</button>';
+      }).join('') + '</div></div>';
+    if (ad.msg) html += '<p class="acct-msg ' + ad.msg.type + '" style="margin:0 0 14px;">' + escapeHtml(ad.msg.text) + '</p>';
+    if (ad.sub === 'stats') html += adminStatsHtml();
+    else if (ad.sub === 'users') html += adminUsersHtml();
+    else if (ad.sub === 'ann') html += adminAnnHtml();
+    else html += adminGlHtml();
+    return html;
+  }
+  function adminLoadingOrErr(){
+    var ad = state.admin;
+    var h = '';
+    if (ad.userErr) h += '<p class="acct-msg err" style="margin:0 0 12px;">' + escapeHtml(ad.userErr) + '</p>';
+    if (ad.loadingUsers && !ad.users) h += '<p class="sm-hint">불러오는 중...</p>';
+    return h;
+  }
+  function adminStatsHtml(){
+    var ad = state.admin, users = ad.users || [];
+    var startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+    var activeToday = 0, calls = 0, tokens = 0, totalTokens = 0, mats = 0;
+    users.forEach(function(u){
+      if ((u.lastSeen || 0) >= startToday.getTime()) activeToday++;
+      var t = usageToday(u); calls += t.calls || 0; tokens += t.tokens || 0;
+      totalTokens += (u.usage && u.usage.totalTokens) || 0; mats += u.total || 0;
+    });
+    var fmtTok = function(n){ return n >= 10000 ? (n / 1000).toFixed(0) + 'K' : String(n); };
+    var card = function(label, val){ return '<div class="help-step"><span class="no">' + label + '</span><h4>' + val + '</h4></div>'; };
+    var def = state.limits.def && typeof state.limits.def.dailyCalls === 'number' ? state.limits.def.dailyCalls : '';
+    return adminLoadingOrErr() +
+      '<div class="help-steps" style="margin-bottom:22px;">' +
+        card('사용자', users.length + '명') + card('오늘 접속', activeToday + '명') +
+        card('오늘 AI 호출', calls + '회') + card('오늘 토큰', fmtTok(tokens)) +
+        card('누적 토큰', fmtTok(totalTokens)) + card('전체 자료', mats + '개') +
+      '</div>' +
+      '<p class="sm-hint">목록은 이 업데이트를 받은 뒤 <b>한 번 이상 접속한 사용자</b>부터 보여요. 오늘 수치는 마지막으로 접속한 시점까지의 값이에요.</p>' +
+      '<div class="acct-block"><div class="acct-label">모든 사용자의 기본 AI 한도</div>' +
+        '<p style="font-size:14.5px;line-height:1.7;color:var(--cream-soft);margin:0 0 10px;">하루에 쓸 수 있는 AI 호출 횟수예요. 비워 두면 한도가 없어요. 사용자마다 따로 정한 값이 있으면 그 값이 우선해요.</p>' +
+        '<div class="field" style="max-width:220px;"><label>하루 호출 횟수</label><input type="number" min="0" id="ad-def-calls" placeholder="한도 없음" value="' + def + '"></div>' +
+        '<button class="btn small" id="ad-def-save">저장</button> ' +
+        '<button class="btn ghost small" id="ad-refresh">새로고침</button>' +
+        '<p class="sm-hint" style="margin-top:10px;">한도는 사용자의 브라우저에서 확인하는 방식이라 일반적인 사용을 조절하는 용도예요. 일부러 우회하는 것까지 막지는 못해요.</p></div>';
+  }
+  function adminUsersHtml(){
+    var ad = state.admin, users = ad.users || [];
+    if (ad.detail) return adminUserDetailHtml();
+    var html = adminLoadingOrErr() +
+      '<p class="sm-hint" style="margin-bottom:12px;">' + users.length + '명 · 최근 접속 순 <button class="btn ghost small" id="ad-refresh" style="margin-left:8px;">새로고침</button></p>';
+    users.forEach(function(u){
+      var t = usageToday(u), lim = ad.userLimits[u.id];
+      html += '<button type="button" class="acct-block" data-aduser="' + escapeHtml(u.id) + '" style="' + AD_ROW + 'cursor:pointer;color:inherit;font:inherit;">' +
+        '<b style="min-width:120px;">' + escapeHtml(userLabel(u)) + '</b>' +
+        '<span>자료 ' + (u.total || 0) + '개</span><span>오늘 AI ' + (t.calls || 0) + '회</span>' +
+        '<span style="color:var(--cream-soft);">접속 ' + adminFmt(u.lastSeen) + '</span>' +
+        (lim ? '<span style="color:var(--gold);">' + (lim.blocked ? '차단됨' : ('한도 ' + (typeof lim.dailyCalls === 'number' ? lim.dailyCalls + '회' : '')) ) + '</span>' : '') +
+      '</button>';
+    });
+    if (!users.length && !ad.loadingUsers) html += '<p class="sm-hint">아직 목록에 사용자가 없어요.</p>';
+    return html;
+  }
+  function adminUserDetailHtml(){
+    var ad = state.admin, d = ad.detail;
+    var u = (ad.users || []).filter(function(x){ return x.id === d.uid; })[0] || { id: d.uid };
+    var lim = ad.userLimits[d.uid] || {};
+    var t = usageToday(u), uu = u.usage || {};
+    var c = u.counts || {};
+    var html = '<p><button class="btn ghost small" id="ad-back">← 사용자 목록</button></p>' +
+      '<div class="acct-block"><div class="acct-label">' + escapeHtml(userLabel(u)) + '</div>' +
+      '<p style="font-size:14.5px;line-height:1.8;color:var(--cream-soft);margin:0;">' +
+        '자료 ' + (u.total || 0) + '개 (승인 ' + (c.a || 0) + ' · 반려 ' + (c.r || 0) + ' · 대기 ' + (c.p || 0) + ')<br>' +
+        '오늘 AI ' + (t.calls || 0) + '회 · 누적 ' + (uu.totalCalls || 0) + '회 / ' + (uu.totalTokens || 0) + ' 토큰<br>' +
+        '공유 링크 ' + (u.links || 0) + '개 · 앱 버전 ' + escapeHtml(u.ver || '-') + ' · 마지막 접속 ' + adminFmt(u.lastSeen) + '<br>' +
+        '<span style="font-size:12.5px;">계정 ID ' + escapeHtml(d.uid) + '</span></p></div>' +
+      '<div class="acct-block"><div class="acct-label">이 사용자의 AI 한도</div>' +
+        '<div class="field" style="max-width:220px;"><label>하루 호출 횟수 (비우면 기본값)</label><input type="number" min="0" id="ad-lim-calls" value="' + (typeof lim.dailyCalls === 'number' ? lim.dailyCalls : '') + '"></div>' +
+        '<div class="toggle-row"><input type="checkbox" id="ad-lim-block" ' + (lim.blocked ? 'checked' : '') + '><label for="ad-lim-block" style="margin:0;">AI 사용 완전히 막기</label></div>' +
+        '<button class="btn small" id="ad-lim-save" data-uid="' + escapeHtml(d.uid) + '">저장</button></div>';
+    html += '<div class="acct-block"><div class="acct-label">자료·평가 기록 (읽기 전용)</div>' +
+      '<p class="sm-hint" style="margin:0 0 10px;">서비스 운영과 문제 해결에 필요할 때만 열람해주세요. 수정·삭제는 할 수 없어요.</p>';
+    if (d.loading) html += '<p class="sm-hint">불러오는 중...</p>';
+    else if (d.err) html += '<p class="acct-msg err" style="margin:0;">' + escapeHtml(d.err) + '</p>';
+    else if (!d.mats) html += '<button class="btn small" id="ad-load-mats" data-uid="' + escapeHtml(d.uid) + '">자료 불러오기</button>';
+    else {
+      var opts = [['all', '전체'], ['approved', '승인'], ['rejected', '반려'], ['pending', '대기']].map(function(x){
+        return '<option value="' + x[0] + '"' + (d.filter === x[0] ? ' selected' : '') + '>' + x[1] + '</option>';
+      }).join('');
+      var list = d.mats.filter(function(m){ return d.filter === 'all' || m.status === d.filter; });
+      var lbl = { approved: '승인', rejected: '반려', pending: '대기' };
+      html += '<div class="field" style="max-width:200px;"><label>보기</label><select id="ad-mat-filter">' + opts + '</select></div>' +
+        '<p class="sm-hint">' + list.length + '개' + (list.length > 200 ? ' (앞의 200개만 표시)' : '') + '</p>';
+      list.slice(0, 200).forEach(function(m){
+        html += '<div style="padding:8px 0;border-top:1px solid var(--line-dark);font-size:14.5px;line-height:1.5;">' +
+          '<b>' + escapeHtml(m.title || '(제목 없음)') + '</b><br><span style="color:var(--cream-soft);font-size:13px;">' +
+          (lbl[m.status] || '') + (m.rejectReason ? ' · ' + escapeHtml(m.rejectReason) : '') + ' · ' + escapeHtml(m.field || '') + ' · ' + escapeHtml(m.source || '') + ' · 평균 ' + avgScore(m) + '점</span></div>';
+      });
+    }
+    return html + '</div>';
+  }
+  function adminAnnHtml(){
+    var ad = state.admin, a = state.announcement;
+    var html = '';
+    if (a && a.active){
+      html += '<div class="acct-block"><div class="acct-label">' + (a.level === 'urgent' ? '긴급 ' : '') + '지금 올라가 있는 공지 · ' + adminFmt(a.createdAt) + '</div>' +
+        '<p style="margin:0 0 6px;"><b>' + escapeHtml(a.title) + '</b></p><p style="font-size:14.5px;line-height:1.7;color:var(--cream-soft);margin:0 0 12px;">' + annTextHtml(a.body) + '</p>' +
+        '<button class="btn ghost small" id="ad-ann-clear">공지 내리기</button></div>';
+    } else html += '<p class="sm-hint">지금 올라가 있는 공지가 없어요.</p>';
+    html += '<div class="acct-block"><div class="acct-label">새 공지 올리기</div>' +
+      '<div class="field"><label>제목</label><input type="text" id="ad-ann-title" maxlength="60" value="' + escapeHtml(ad.annTitle) + '"></div>' +
+      '<div class="field"><label>내용</label><textarea id="ad-ann-body" rows="5" maxlength="1500" style="width:100%;">' + escapeHtml(ad.annBody) + '</textarea></div>' +
+      '<div class="toggle-row"><input type="checkbox" id="ad-ann-urgent" ' + (ad.annUrgent ? 'checked' : '') + '><label for="ad-ann-urgent" style="margin:0;"><b>긴급 공지</b> · 지금 접속 중인 사용자에게도 바로 띄우기</label></div>' +
+      '<button class="btn small" id="ad-ann-post">올리기</button>' +
+      '<p class="sm-hint" style="margin-top:10px;">새 공지를 올리면 이전 공지는 바뀌어요. 일반 공지는 사용자가 다음에 접속할 때 팝업으로 한 번 보게 되고, 긴급 공지는 접속 중인 사람에게 즉시 떠요.</p></div>';
+    return html;
+  }
+  function adminGlHtml(){
+    var ad = state.admin;
+    if (!ad.groups && !ad.loadingGl) { setTimeout(adminLoadGl, 0); }
+    var html = '';
+    if (ad.glErr) html += '<p class="acct-msg err" style="margin:0 0 12px;">' + escapeHtml(ad.glErr) + '</p>';
+    if (ad.loadingGl && !ad.groups) return html + '<p class="sm-hint">불러오는 중...</p>';
+    html += '<p class="sm-hint" style="margin-bottom:12px;"><button class="btn ghost small" id="ad-gl-refresh">새로고침</button></p>';
+    html += '<p class="section-title" style="font-size:19px;">그룹 (' + (ad.groups || []).length + '개)</p>';
+    (ad.groups || []).forEach(function(g){
+      html += '<div class="acct-block" style="' + AD_ROW + '"><b style="min-width:140px;">' + escapeHtml(g.name || '') + '</b><span>' + (g.memberUids || []).length + '명</span>' +
+        '<span style="color:var(--cream-soft);">만든 이 ' + escapeHtml(g.ownerName || '') + ' · ' + adminFmt(g.createdAt) + ' · 코드 ' + escapeHtml(g.code) + '</span>' +
+        '<button class="btn ghost small" data-addelgroup="' + escapeHtml(g.code) + '" style="margin-left:auto;">삭제</button></div>';
+    });
+    if (!(ad.groups || []).length) html += '<p class="sm-hint">그룹이 없어요.</p>';
+    html += '<p class="section-title" style="font-size:19px;margin-top:22px;">공유 링크 (' + (ad.links || []).length + '개, 최근 100개)</p>';
+    (ad.links || []).forEach(function(l){
+      html += '<div class="acct-block" style="' + AD_ROW + '"><b style="min-width:140px;">' + escapeHtml(l.title || '') + '</b><span>' + (l.items || []).length + '개 자료</span>' +
+        '<span style="color:var(--cream-soft);">만든 이 ' + escapeHtml(l.ownerName || '') + ' · ' + adminFmt(l.createdAt) + ' · 코드 ' + escapeHtml(l.code) + '</span>' +
+        '<button class="btn ghost small" data-addellink="' + escapeHtml(l.code) + '" style="margin-left:auto;">중단</button></div>';
+    });
+    if (!(ad.links || []).length) html += '<p class="sm-hint">공유 링크가 없어요.</p>';
+    return html;
+  }
+  function attachAdminHandlers(){
+    var ad = state.admin;
+    var $ = function(id){ return document.getElementById(id); };
+    var annOk = $('ann-ok'); if (annOk) annOk.addEventListener('click', dismissAnn);
+    var annX = $('ann-close-x'); if (annX) annX.addEventListener('click', dismissAnn);
+    if (state.tab !== 'admin' || !state.isAdmin) return;
+    document.querySelectorAll('[data-adsub]').forEach(function(b){
+      b.addEventListener('click', function(){ ad.sub = b.getAttribute('data-adsub'); ad.msg = null; if (ad.sub !== 'users') ad.detail = null; render(); });
+    });
+    document.querySelectorAll('[data-aduser]').forEach(function(b){
+      b.addEventListener('click', function(){ ad.msg = null; ad.detail = { uid: b.getAttribute('data-aduser'), loading: false, err: null, mats: null, filter: 'all' }; render(); });
+    });
+    var back = $('ad-back'); if (back) back.addEventListener('click', function(){ ad.detail = null; ad.msg = null; render(); });
+    var ref = $('ad-refresh'); if (ref) ref.addEventListener('click', adminLoadUsers);
+    var glr = $('ad-gl-refresh'); if (glr) glr.addEventListener('click', adminLoadGl);
+    var defSave = $('ad-def-save'); if (defSave) defSave.addEventListener('click', adminSaveDefault);
+    var limSave = $('ad-lim-save'); if (limSave) limSave.addEventListener('click', function(){ adminSaveLimit(limSave.getAttribute('data-uid')); });
+    var lm = $('ad-load-mats'); if (lm) lm.addEventListener('click', function(){ adminLoadUserData(lm.getAttribute('data-uid')); });
+    var mf = $('ad-mat-filter'); if (mf) mf.addEventListener('change', function(){ ad.detail.filter = mf.value; render(); });
+    var at = $('ad-ann-title'); if (at) at.addEventListener('input', function(){ ad.annTitle = at.value; });
+    var ab = $('ad-ann-body'); if (ab) ab.addEventListener('input', function(){ ad.annBody = ab.value; });
+    var au = $('ad-ann-urgent'); if (au) au.addEventListener('change', function(){ ad.annUrgent = au.checked; });
+    var ap = $('ad-ann-post'); if (ap) ap.addEventListener('click', adminPostAnn);
+    var ac = $('ad-ann-clear'); if (ac) ac.addEventListener('click', function(){ if (confirm('올라가 있는 공지를 내릴까요?')) adminClearAnn(); });
+    document.querySelectorAll('[data-addelgroup]').forEach(function(b){
+      b.addEventListener('click', function(){ if (confirm('이 그룹과 그룹에 담긴 자료를 모두 삭제할까요? 되돌릴 수 없어요.')) adminDeleteGroup(b.getAttribute('data-addelgroup')); });
+    });
+    document.querySelectorAll('[data-addellink]').forEach(function(b){
+      b.addEventListener('click', function(){ if (confirm('이 공유 링크를 중단할까요? 링크를 가진 사람은 더 이상 볼 수 없어요.')) adminDeleteLink(b.getAttribute('data-addellink')); });
+    });
+  }
+
+  // ---- 새 버전 감지 + 자동 새로고침 ----
+  // Re-fetches this very script (revalidating, so a 304 is cheap and the HTTP cache gets
+  // the new copy) and compares its APP_VERSION. If newer: banner, then reload once the
+  // user is idle (no AI call running, nothing being typed) and the save has been flushed.
+  var updateFound = null, updateChecking = false, updateTimer = null;
+  var netInFlight = 0, lastActive = Date.now();
+  var rawFetch = window.fetch ? window.fetch.bind(window) : null;
+  if (rawFetch){
+    // count AI / proxy requests so a reload never cuts one off
+    window.fetch = function(input){
+      var url = (typeof input === 'string') ? input : ((input && input.url) || '');
+      var tracked = url.indexOf('generativelanguage.googleapis.com') !== -1 || url.indexOf(PROXY_BASE_URL) === 0;
+      var p = rawFetch.apply(null, arguments);
+      if (tracked){
+        netInFlight++;
+        var done = function(){ netInFlight--; lastActive = Date.now(); };
+        p.then(done, done);
+      }
+      return p;
+    };
+  }
+  ['click', 'keydown', 'touchstart', 'input'].forEach(function(ev){
+    document.addEventListener(ev, function(){ lastActive = Date.now(); }, true);
+  });
+
+  function appScriptUrl(){
+    var els = document.getElementsByTagName('script');
+    for (var i = 0; i < els.length; i++){
+      var src = els[i].src || '';
+      if (/\/app\.js(\?|$)/.test(src)) return src;
+    }
+    return null;
+  }
+  function userIsTyping(){
+    var a = document.activeElement;
+    if (!a) return false;
+    var tag = (a.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || a.isContentEditable === true;
+  }
+  function reloadForUpdate(){
+    // never reload twice for the same version within 10 minutes (guards a loop if a stale copy keeps coming back)
+    try {
+      var k = JSON.parse(sessionStorage.getItem('archiveUpdateTry') || 'null');
+      if (k && k.v === updateFound && Date.now() - k.t < 600000) return false;
+      sessionStorage.setItem('archiveUpdateTry', JSON.stringify({ v: updateFound, t: Date.now() }));
+    } catch(e){}
+    if (usageTimer){ clearTimeout(usageTimer); usageTimer = null; persistAppData(); }
+    var flush = Promise.resolve(currentSavePromise).then(function(){ return saveDirty ? currentSavePromise : null; });
+    withTimeout(flush, 4000).then(function(){ location.reload(); }, function(){ location.reload(); });
+    return true;
+  }
+  function updateSafeToReload(){
+    return netInFlight === 0 && !(state.rescore && state.rescore.busy) && !userIsTyping() && !state.pendingReject;
+  }
+  function showUpdateBanner(){
+    if (document.getElementById('update-banner')) return;
+    var b = document.createElement('div');
+    b.id = 'update-banner';
+    b.setAttribute('role', 'status');
+    b.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:200;max-width:calc(100vw - 24px);' +
+      'background:#F3EEDF;color:#20281F;border:1px solid #C89B3C;border-radius:6px;padding:12px 16px;box-shadow:0 8px 28px rgba(0,0,0,.4);' +
+      'display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:15px;line-height:1.5;';
+    b.innerHTML = '<span><b>새 버전(v' + escapeHtml(updateFound) + ')</b>이 나왔어요. 하던 일이 끝나면 자동으로 새로고침돼요.</span>' +
+      '<button type="button" id="update-now" style="background:#C89B3C;color:#16302E;border:none;border-radius:4px;padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer;">지금 새로고침</button>';
+    document.body.appendChild(b);
+    document.getElementById('update-now').addEventListener('click', function(){
+      var btn = document.getElementById('update-now'); btn.disabled = true; btn.textContent = '저장 후 새로고침...';
+      try { sessionStorage.removeItem('archiveUpdateTry'); } catch(e){}
+      reloadForUpdate();
+    });
+    if (!updateTimer){
+      updateTimer = setInterval(function(){
+        var idle = Date.now() - lastActive > 45000;
+        if (updateSafeToReload() && (idle || document.hidden)) reloadForUpdate();
+      }, 5000);
+    }
+  }
+  function checkForUpdate(){
+    if (updateFound || updateChecking || !rawFetch) return;
+    var src = appScriptUrl();
+    if (!src) return;
+    updateChecking = true;
+    rawFetch(src, { cache: 'no-cache' }).then(function(r){ return r.ok ? r.text() : ''; }).then(function(t){
+      var m = /var APP_VERSION = '([^']+)'/.exec(t || '');
+      if (m && m[1] !== APP_VERSION){ updateFound = m[1]; showUpdateBanner(); }
+    }).catch(function(){}).then(function(){ updateChecking = false; });
+  }
+  function startUpdateWatcher(){
+    setTimeout(checkForUpdate, 20000);
+    setInterval(checkForUpdate, 300000);
+    document.addEventListener('visibilitychange', function(){
+      if (document.hidden) return;
+      checkForUpdate();
+      if (state.user && state.loaded && Date.now() - flagsAt > 300000) loadAccessFlags();
+    });
+  }
+
   bootstrap();
+  startUpdateWatcher();
 })();
