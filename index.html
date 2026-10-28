@@ -709,6 +709,65 @@
   function appDataDocRef(uidOverride){
     return fbDb.collection('users').doc(uidOverride || state.user.uid).collection('store').doc('app-data');
   }
+  // ---- paged storage (no more 1MB single-document ceiling) ----
+  // materials and issues live in "pages" (docs under users/{uid}/store, each
+  // kept under ~300KB). A save only rewrites pages whose content changed, and
+  // the small app-data doc is committed in the SAME batch, so a crash can
+  // never leave the pages and the marker out of step.
+  var PAGE_BYTES = 300000;
+  var pageCache = {};   // col -> JSON strings of the pages as last written/loaded
+  var enc = (typeof TextEncoder !== 'undefined') ? new TextEncoder() : null;
+  function byteLen(str){ return enc ? enc.encode(str).length : str.length * 3; }
+  function packPages(items){
+    var pages = [], cur = [], size = 0;
+    (items || []).forEach(function(it){
+      var b = byteLen(JSON.stringify(it)) + 8;
+      if (cur.length && size + b > PAGE_BYTES){ pages.push(cur); cur = []; size = 0; }
+      cur.push(it); size += b;
+    });
+    if (cur.length || !pages.length) pages.push(cur);
+    return pages;
+  }
+  function pageRef(uid0, col, i){
+    return fbDb.collection('users').doc(uid0).collection('store').doc(col + '-p' + ('000' + i).slice(-3));
+  }
+  // queue the changed pages of one collection into a batch; returns {count, jsons}
+  function queuePages(batch, uid0, col, items){
+    var pages = packPages(items);
+    var jsons = pages.map(function(pg){ return JSON.stringify(pg); });
+    var last = pageCache[col] || [];
+    jsons.forEach(function(j, i){
+      if (last[i] !== j) batch.set(pageRef(uid0, col, i), { idx: i, items: pages[i], updatedAt: Date.now() });
+    });
+    for (var i = jsons.length; i < last.length; i++) batch.delete(pageRef(uid0, col, i));
+    return { count: jsons.length, jsons: jsons };
+  }
+  function loadPages(uid0, col, n){
+    var jobs = [];
+    for (var i = 0; i < n; i++) jobs.push(pageRef(uid0, col, i).get());
+    return Promise.all(jobs).then(function(snaps){
+      var out = [];
+      snaps.forEach(function(sn){
+        if (!sn.exists) throw new Error('저장된 데이터 일부를 찾지 못했어요. 잠시 후 다시 시도해주세요.');
+        out = out.concat(sn.data().items || []);
+      });
+      return out;
+    });
+  }
+  function primePageCache(col, items, realCount){
+    var jsons = packPages(items).map(function(pg){ return JSON.stringify(pg); });
+    while (jsons.length < realCount) jsons.push(null);   // stale extra pages get deleted on the next save
+    pageCache[col] = jsons;
+  }
+  function storageStats(){
+    var bytes = 0;
+    state.materials.forEach(function(m){ bytes += byteLen(JSON.stringify(m)); });
+    var ib = 0;
+    state.issues.forEach(function(x){ ib += byteLen(JSON.stringify(x)); });
+    return { materials: state.materials.length, matBytes: bytes, issues: state.issues.length, issueBytes: ib,
+             pages: packPages(state.materials).length + packPages(state.issues).length };
+  }
+
   // Coalescing save: if a write is already in flight when another change
   // comes in, we don't queue a second full round-trip — we just flag
   // "there's newer state" and, once the in-flight write finishes, send ONE
@@ -739,7 +798,7 @@
   }
 
   function persistAppData(){
-    if (!state.user) return Promise.resolve();
+    if (!state.user || !state.loaded) return Promise.resolve();
     saveDirty = true;
     if (savingInFlight) return currentSavePromise;
     return runSave();
@@ -749,13 +808,15 @@
     savingInFlight = true;
     saveDirty = false;
     var uidAtCallTime = state.user.uid;
+    var batch = fbDb.batch();
+    var mq = queuePages(batch, uidAtCallTime, 'materials', state.materials);
+    var iq = queuePages(batch, uidAtCallTime, 'issues', state.issues);
     var payload = {
-      materials: state.materials,
+      paged: { v: 2, materials: mq.count, issues: iq.count },
       weights: state.weights,
       bias: state.bias,
       trained: state.trained,
       geminiSettings: state.geminiSettings,
-      issues: state.issues,
       sharing: state.sharing,
       importedProfiles: state.importedProfiles,
       tutorialDone: state.tutorialDone,
@@ -765,7 +826,9 @@
     };
     // keep the published share snapshot in step with what was just saved
     publishSharedProfile().catch(function(){});
-    currentSavePromise = appDataDocRef(uidAtCallTime).set(payload)
+    batch.set(appDataDocRef(uidAtCallTime), payload);
+    currentSavePromise = batch.commit()
+      .then(function(){ pageCache.materials = mq.jsons; pageCache.issues = iq.jsons; })
       .catch(function(e){ showToast('저장에 실패했어요. 네트워크 연결을 확인해주세요.'); })
       .then(function(){
         savingInFlight = false;
@@ -803,7 +866,7 @@
     authView: 'login',
     authError: null,
     authLoading: false,
-    loaded: false,
+    loaded: false, loadError: null,
     materials: [],
     weights: {},
     bias: 0,
@@ -883,10 +946,34 @@
       return;
     }
 
+    pageCache = {};
+    state.loadError = null;
+    var data = null;
     try {
+      var uidAtLoad = state.user.uid;
       var snap = await appDataDocRef().get();
-      if (!snap.exists) throw new Error('no data yet');
-      var data = snap.data();
+      if (snap.exists){
+        data = snap.data();
+        if (data.paged && data.paged.v === 2){
+          // new layout: materials/issues live in pages
+          var mats = await loadPages(uidAtLoad, 'materials', data.paged.materials || 0);
+          var iss = await loadPages(uidAtLoad, 'issues', data.paged.issues || 0);
+          data.materials = mats; data.issues = iss;
+          primePageCache('materials', mats, data.paged.materials || 0);
+          primePageCache('issues', iss, data.paged.issues || 0);
+        }
+        // legacy layout (materials inline) falls through; the next save migrates it to pages
+      }
+    } catch(e){
+      // A failed READ must never be treated as "no data": saving seed data now
+      // would overwrite the user's real materials. Show a retry screen instead.
+      if (!state.user) return;
+      state.loadError = (e && e.message) ? e.message : '알 수 없는 오류';
+      state.loaded = false;
+      render();
+      return;
+    }
+    if (data){
       state.materials = data.materials || seedMaterials();
       state.weights = data.weights || zeroWeights();
       state.bias = typeof data.bias === 'number' ? data.bias : 0;
@@ -898,7 +985,8 @@
       state.tutorialDone = data.tutorialDone === true;
       state.sharedLinks = Array.isArray(data.sharedLinks) ? data.sharedLinks : [];
       state.displayName = typeof data.displayName === 'string' ? data.displayName : '';
-    } catch(e){
+    } else {
+      // account exists but has never saved anything: start from seed data
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
       state.geminiSettings = { model: 'gemini-2.5-flash' };
@@ -907,6 +995,7 @@
       state.importedProfiles = [];
       state.sharedLinks = []; state.displayName = '';
       state.tutorialDone = false;
+      state.loaded = true;
       persistAppData();
     }
 
@@ -914,6 +1003,7 @@
     state.tutorialOpen = !state.tutorialDone; state.tutorialStep = 0;
     state.loaded = true;
     render();
+    if (data && !(data.paged && data.paged.v === 2)) persistAppData();   // one-time move to the paged layout
   }
 
   async function saveMaterials(){ return persistAppData(); }
@@ -1063,6 +1153,15 @@
       return;
     }
     if (!state.loaded){
+      if (state.loadError){
+        app.innerHTML = '<div class="empty" style="height:auto;padding:40px 20px;"><h3>서고를 불러오지 못했어요</h3>' +
+          '<p>' + escapeHtml(state.loadError) + '</p><p>저장된 자료는 그대로 안전해요. 네트워크를 확인하고 다시 시도해주세요.</p>' +
+          '<p style="margin-top:14px;"><button class="btn small" id="load-retry">다시 불러오기</button> ' +
+          '<button class="btn ghost small" id="load-logout">로그아웃</button></p></div>';
+        document.getElementById('load-retry').addEventListener('click', function(){ state.loadError = null; render(); loadState(false); });
+        document.getElementById('load-logout').addEventListener('click', function(){ fbAuth.signOut(); });
+        return;
+      }
       app.innerHTML = loadingHtml('서고를 여는 중...');
       return;
     }
@@ -3377,7 +3476,13 @@
         '<button class="btn ghost small" id="gemini-save" ' + (state.geminiTestLoading?'disabled':'') + '>' + (state.geminiTestLoading ? '연결 확인 중...' : '모델 저장하기') + '</button>' +
       '</div></div>';
 
-    html += '<p class="section-title">데이터 관리</p><button class="btn ghost small" id="reset-all">모든 데이터 초기화</button>';
+    var st = storageStats();
+    var kb = function(b){ return b < 1024 * 1024 ? Math.max(1, Math.round(b / 1024)) + 'KB' : (b / 1048576).toFixed(1) + 'MB'; };
+    html += '<p class="section-title">데이터 관리</p>' +
+      '<div class="acct-block"><div class="acct-label">저장 용량</div>' +
+      '<p style="font-size:14.5px;line-height:1.7;color:var(--cream-soft);margin:0;">자료 <b style="color:var(--cream);">' + st.materials + '개</b> (약 ' + kb(st.matBytes) + ') · 의견 이슈 <b style="color:var(--cream);">' + st.issues + '개</b> (약 ' + kb(st.issueBytes) + ')<br>' +
+      '데이터는 약 300KB씩 나눠(' + st.pages + '개 묶음) 저장해서, 예전의 "계정당 1MB" 한계 없이 수천 개의 자료를 담을 수 있어요.</p></div>' +
+      '<button class="btn ghost small" id="reset-all">모든 데이터 초기화</button>';
 
     html += '<p class="section-title">계정 관리</p>';
     html += '<div style="font-size:14px;color:var(--cream-soft);margin-bottom:14px;">현재 로그인: <b style="color:var(--gold);">' + escapeHtml(state.user ? state.user.email : '') + '</b></div>';
@@ -4383,6 +4488,7 @@
       state.authChecked = true;
       savingInFlight = false;
       saveDirty = false;
+      pageCache = {};
       currentSavePromise = Promise.resolve();
       if (user){
         state.user = { uid: user.uid, email: user.email };
