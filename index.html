@@ -1151,7 +1151,7 @@
     '</div>' +
     '<p style="font-size:14px;color:var(--cream-soft);margin:-8px 0 16px;">키워드를 비워두면 학습된 성향만으로, 입력하면 그 키워드를 성향과 함께 반영해서 찾아요.</p>';
 
-    html += '<div class="field" style="max-width:200px;"><label>수집 개수 (최대 10)</label><input type="text" id="home-count" value="' + h.count + '" /></div>';
+    html += '<div class="field" style="max-width:200px;"><label>수집 개수 (최대 50)</label><input type="text" id="home-count" value="' + h.count + '" /></div>';
     html += '<div class="toggle-row"><input type="checkbox" id="home-ai-score" checked /><label for="home-ai-score" style="margin:0;">등록할 때 AI가 9개 요소 점수를 자동으로 매기기</label></div>' +
       '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="home-ai-engine">' +
         '<option value="gemini" selected>Gemini</option>' +
@@ -1258,7 +1258,7 @@
     } else if (b.mode === 'generate') {
       html += '<div class="field-row">' +
           '<div class="field"><label>분야</label><select id="bulk-gen-field"><option value="random">무작위</option>' + fieldOptions + '</select></div>' +
-          '<div class="field"><label>개수 (최대 30)</label><input type="text" id="bulk-gen-count" value="5" /></div>' +
+          '<div class="field"><label>개수 (최대 100)</label><input type="text" id="bulk-gen-count" value="5" /></div>' +
         '</div>' +
         '<p style="font-size:14px;color:var(--cream-soft);margin-bottom:14px;">평가 요소 점수가 무작위로 채워진 샘플 자료를 생성합니다. 카드 평가·상대 비교 기능을 테스트하거나 학습 데이터를 빠르게 늘리고 싶을 때 사용하세요.</p>' +
         '<button class="btn" id="bulk-generate">샘플 자동 생성하기</button>';
@@ -1268,7 +1268,7 @@
       html += '<p class="bulk-note" style="border-color:var(--gold-soft);"><b>무분별 수집</b> — 분야와 키워드에 맞는 검색 결과를 걸러내지 않고 그대로 가져옵니다. (Tavily 검색 사용) 내 성향에 맞는 것만 골라 담고 싶다면 "분별 수집"을 쓰세요.</p>' +
         '<div class="field"><label>적용할 분야</label><select id="tavily-field">' + fieldOptions + '</select></div>' +
         '<div class="field"><label>검색 키워드</label><input type="text" id="tavily-kw" placeholder="예: 양자컴퓨팅 상용화" /></div>' +
-        '<div class="field"><label>수집 개수 (최대 10)</label><input type="text" id="tavily-count" value="5" /></div>' +
+        '<div class="field"><label>수집 개수 (최대 50)</label><input type="text" id="tavily-count" value="5" /></div>' +
         '<div class="toggle-row"><input type="checkbox" id="tavily-ai-score" checked /><label for="tavily-ai-score" style="margin:0;">등록할 때 AI가 9개 요소 점수를 자동으로 매기기</label></div>' +
         '<div class="field" style="max-width:220px;"><label>채점 엔진</label><select id="tavily-ai-engine">' +
           '<option value="gemini" selected>Gemini</option>' +
@@ -1418,7 +1418,7 @@
         '<div class="field"><label>분야</label><select id="sel-field">' + fieldOptions + '</select></div>' +
       '</div>' +
       '<div class="field-row">' +
-        '<div class="field"><label>목표 수량 (최대 30)</label><input type="text" id="sel-count" value="' + s.count + '" /></div>' +
+        '<div class="field"><label>목표 수량 (최대 50)</label><input type="text" id="sel-count" value="' + s.count + '" /></div>' +
         '<div class="field"><label>AI 필터 엄격도</label><select id="sel-strict">' + strictOptions + '</select></div>' +
       '</div>' +
       '<p style="font-size:14px;color:var(--cream-soft);margin:-8px 0 16px;">' + escapeHtml((STRICT_LEVELS[s.strict] || STRICT_LEVELS.normal).hint) + ' 통과한 자료는 AI가 매긴 9개 요소 점수와 통과 이유가 함께 등록돼요.' + (profile.source === 'shared' ? ' 공유받은 성향은 수집할 때마다 공유한 사람의 최신 상태로 다시 불러와요.' : '') + '</p>' +
@@ -1499,10 +1499,10 @@
   // chosen profile's learned fit so the best matches win if more passed than needed.
   async function selectiveCollect(profile, s, onProgress){
     var seen = existingUrlSet();
-    var suffixes = ['', ' 분석', ' 전문가 의견', ' 최신 동향', ' 연구'];
+    var suffixes = ['', ' 분석', ' 전문가 의견', ' 최신 동향', ' 연구', ' 사례', ' 현황', ' 전망'];
     var brief = profileSearchBrief(profile, s.field);
     var baseQuery = buildTavilyQuery(brief, s.keyword);
-    var windowSize = Math.min(15, Math.max(6, s.count * 2));
+    var windowSize = Math.min(20, Math.max(6, s.count * 2));
     var kept = [], scanned = 0, dropped = 0, rounds = 0, filterFailed = null;
     var fallbackField = s.field || profile.field || Object.keys(FIELD_TREE)[0];
 
@@ -1687,7 +1687,7 @@
       '<div class="acct-label">AI로 의견 자동 수집</div>' +
       '<p style="font-size:14px;color:var(--cream-soft);margin:0 0 12px;">아래 주제로 웹에서 찬성·반대·전문가 분석 등 다양한 시각의 글을 찾아서, AI가 각 출처의 입장을 한두 문장으로 요약해 가져와요.</p>' +
       '<div class="field"><label>검색 주제</label><input type="text" id="opn-collect-topic" value="' + escapeHtml(ov.collectTopic || issue.title) + '" /></div>' +
-      '<div class="field" style="max-width:160px;"><label>수집 개수 (최대 30)</label><input type="text" id="opn-collect-count" value="' + (ov.collectCount||6) + '" /></div>' +
+      '<div class="field" style="max-width:160px;"><label>수집 개수 (최대 50)</label><input type="text" id="opn-collect-count" value="' + (ov.collectCount||6) + '" /></div>' +
       '<button class="btn" id="opn-collect-btn" ' + (ov.collectLoading?'disabled':'') + '>' + (ov.collectLoading ? '수집하는 중...' : 'AI로 의견 찾기') + '</button>' +
       (ov.collectMsg ? '<p style="margin-top:10px;font-size:14px;color:var(--cream-soft);">' + escapeHtml(ov.collectMsg) + '</p>' : '') +
       '</div>';
@@ -1813,7 +1813,11 @@
       });
     }
     if (collected.length === 0) return [];
-    return extractOpinionsGemini(collected.slice(0, targetCount), issue.title);
+    var picked = collected.slice(0, targetCount), out = [];
+    for (var c = 0; c < picked.length; c += 20){
+      out = out.concat(await extractOpinionsGemini(picked.slice(c, c + 20), issue.title));
+    }
+    return out;
   }
 
   // Groups the issue's opinions into a small number of stance clusters with
@@ -1936,20 +1940,28 @@
     var collected = [];
     var totalSkipped = 0;
     var attempts = 0;
-    var maxAttempts = 4;
-    var maxWindow = 20; // Tavily's practical ceiling for max_results
-    var requestSize = targetCount;
+    var maxWindow = 20; // Tavily's practical ceiling for max_results per call
+    // Beyond one window the same query just returns the same top results, so
+    // once the window is maxed out, keep going with a different angle each time.
+    var angles = ['', ' 분석', ' 최신 동향', ' 전문가 의견', ' 연구', ' 사례', ' 현황', ' 전망'];
+    var angleIdx = 0;
+    var maxAttempts = Math.min(angles.length + 1, Math.max(4, Math.ceil(targetCount / 8) + 2));
+    var requestSize = Math.min(maxWindow, targetCount);
 
     while (collected.length < targetCount && attempts < maxAttempts){
       attempts++;
       if (onProgress) onProgress(attempts, collected.length);
-      var items = await tavilySearch(query, requestSize);
+      var items = await tavilySearch(query + angles[angleIdx], requestSize);
       var res = dedupeAgainstSeen(items, seen);
       totalSkipped += res.skipped;
       var needed = targetCount - collected.length;
       collected = collected.concat(res.kept.slice(0, needed));
-      if (res.kept.length === 0 && requestSize >= maxWindow) break; // no more to find
-      requestSize = Math.min(maxWindow, requestSize + targetCount);
+      if (requestSize < maxWindow){
+        requestSize = Math.min(maxWindow, requestSize + targetCount); // widen the window first
+      } else {
+        angleIdx++;
+        if (angleIdx >= angles.length) break; // out of new angles
+      }
     }
 
     return { items: collected, skipped: totalSkipped, attempts: attempts, shortBy: Math.max(0, targetCount - collected.length) };
@@ -2059,7 +2071,23 @@
     return list;
   }
 
+  // Big batches are scored in chunks so one prompt/response never gets huge;
+  // the spread safety net then runs over the whole batch together.
   async function estimateScoresBatchGemini(items){
+    var CHUNK = 20, out = [], firstErr = null;
+    for (var i = 0; i < items.length; i += CHUNK){
+      try {
+        out = out.concat(await estimateScoresChunkGemini(items.slice(i, i + CHUNK)));
+      } catch(e){
+        if (!out.length && i === 0) throw e;
+        firstErr = firstErr || e;
+        out = out.concat(items.slice(i, i + CHUNK).map(function(){ return null; }));
+      }
+    }
+    return spreadScores(out);
+  }
+
+  async function estimateScoresChunkGemini(items){
     var gs = state.geminiSettings || {};
     var model = gs.model || 'gemini-2.5-flash';
 
@@ -2085,7 +2113,7 @@
     if (!Array.isArray(arr)) throw new Error('invalid response shape');
     var byIndex = {};
     arr.forEach(function(r){ if (r && r.index) byIndex[r.index] = r.scores; });
-    return spreadScores(items.map(function(it, i){
+    return items.map(function(it, i){
       var s = byIndex[i+1];
       if (!s) return null;
       var scores = {};
@@ -2094,7 +2122,7 @@
         scores[c.key] = Math.max(0, Math.min(100, Math.round(v)));
       });
       return scores;
-    }));
+    });
   }
 
   function estimateScoresBatch(items, engine){
@@ -2578,7 +2606,7 @@
     var homeCollectBtn = document.getElementById('home-collect');
     if (homeCollectBtn) homeCollectBtn.addEventListener('click', function(){
       var countRaw = parseInt(document.getElementById('home-count').value, 10);
-      var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(10, countRaw));
+      var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(50, countRaw));
       var manualField = document.getElementById('home-field') ? document.getElementById('home-field').value : state.home.field;
       var keyword = document.getElementById('home-keyword') ? document.getElementById('home-keyword').value.trim() : (state.home.keyword || '');
       state.home.field = manualField;
@@ -2683,7 +2711,7 @@
     if (bulkGenBtn) bulkGenBtn.addEventListener('click', function(){
       var field = document.getElementById('bulk-gen-field').value;
       var countRaw = parseInt(document.getElementById('bulk-gen-count').value, 10);
-      var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(30, countRaw));
+      var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(100, countRaw));
       var created = generateSampleMaterials(count, field);
       state.materials = state.materials.concat(created);
       saveMaterials();
@@ -2695,7 +2723,7 @@
       var keyword = document.getElementById('tavily-kw').value.trim();
       var field = document.getElementById('tavily-field').value;
       var countRaw = parseInt(document.getElementById('tavily-count').value, 10);
-      var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(10, countRaw));
+      var count = isNaN(countRaw) ? 5 : Math.max(1, Math.min(50, countRaw));
       var aiScore = document.getElementById('tavily-ai-score') ? document.getElementById('tavily-ai-score').checked : false;
       var aiEngine = document.getElementById('tavily-ai-engine') ? document.getElementById('tavily-ai-engine').value : 'gemini';
       if (!keyword){ showToast('검색 키워드를 입력해주세요'); return; }
@@ -2805,7 +2833,7 @@
     if (selCollectBtn) selCollectBtn.addEventListener('click', function(){
       var s = state.bulk.sel;
       var countRaw = parseInt(document.getElementById('sel-count').value, 10);
-      s.count = isNaN(countRaw) ? 10 : Math.max(1, Math.min(30, countRaw));
+      s.count = isNaN(countRaw) ? 10 : Math.max(1, Math.min(50, countRaw));
       s.keyword = document.getElementById('sel-kw').value.trim();
       s.field = document.getElementById('sel-field').value;
       s.strict = document.getElementById('sel-strict').value;
@@ -2984,7 +3012,7 @@
       if (!issue) return;
       var topic = document.getElementById('opn-collect-topic').value.trim() || issue.title;
       var countRaw = parseInt(document.getElementById('opn-collect-count').value, 10);
-      var count = isNaN(countRaw) ? 6 : Math.max(2, Math.min(30, countRaw));
+      var count = isNaN(countRaw) ? 6 : Math.max(2, Math.min(50, countRaw));
       state.opinionsView.collectTopic = topic;
       state.opinionsView.collectCount = count;
       state.opinionsView.collectLoading = true;
