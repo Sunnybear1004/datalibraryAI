@@ -68,9 +68,15 @@
   // ---- 업데이트 기록 ----
   // Newest first. When shipping a change: add an entry at the TOP and bump
   // APP_VERSION to its v. Users who have not seen it get a popup on next load.
-  var APP_VERSION = '1.12';
+  var APP_VERSION = '1.13';
   var CHANGELOG = [
-    { v: '1.12', date: '2026-10-28', title: '긴급 공지',
+    { v: '1.13', date: '2026-10-28', title: 'AI 설정은 관리자가 · 사용량 그래프',
+      items: [
+        '<b>AI 모델·키 설정이 관리자에게로</b> 옮겨갔어요. 이제 사용자는 모델을 고르거나 설정할 필요가 없어요. 설정 → AI 사용량에서 남은 횟수만 보면 돼요.',
+        '관리자 화면에 <b>AI·검색(Tavily) 사용량과 남은 한도</b>, <b>사용자별 사용량 그래프</b>, 최근 7일 추이가 생겼어요.',
+        '검색(Tavily) 사용량도 기록하고, 관리자가 사용자별·전체 하루 한도를 정할 수 있어요.'
+      ] },
+    { v: '1.12', title: '긴급 공지',
       items: ['관리자가 <b>긴급 공지</b>를 올리면 지금 접속해 있는 사람에게도 새로고침 없이 바로 팝업이 떠요.'] },
     { v: '1.11', title: '관리자 모드 · 공지 · AI 사용 한도',
       items: [
@@ -210,20 +216,52 @@
     var d = new Date();
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
   }
-  function trackUsage(um){
+  // One rolling record per account: today, this month, all time, plus the last 7 days
+  // (hist) so the admin can chart trends without a separate log.
+  function rollUsage(){
+    var day = todayKey(), mon = day.slice(0, 7);
     var u = state.aiUsage;
-    if (!u || u.day !== todayKey()){
-      u = state.aiUsage = { day: todayKey(), calls: 0, tokens: 0, totalCalls: (u && u.totalCalls) || 0, totalTokens: (u && u.totalTokens) || 0 };
+    if (!u || typeof u !== 'object') u = state.aiUsage = { day: day, calls: 0, tokens: 0, totalCalls: 0, totalTokens: 0 };
+    if (u.day !== day){
+      if (u.day && (u.calls || u.tcalls)){
+        u.hist = (Array.isArray(u.hist) ? u.hist : []).concat([{ d: u.day, c: u.calls || 0, k: u.tokens || 0, t: u.tcalls || 0 }]).slice(-7);
+      }
+      u.day = day; u.calls = 0; u.tokens = 0; u.tcalls = 0; u.q = 0;
     }
-    var t = (um && Number(um.totalTokenCount)) || 0;
-    u.calls++; u.totalCalls++; u.tokens += t; u.totalTokens += t;
+    if (u.mon !== mon){ u.mon = mon; u.mc = 0; u.mk = 0; u.mt = 0; }
+    u.totalCalls = u.totalCalls || 0; u.totalTokens = u.totalTokens || 0; u.totalT = u.totalT || 0;
+    return u;
+  }
+  function queueUsageSave(){
     if (usageTimer) clearTimeout(usageTimer);
     usageTimer = setTimeout(function(){ usageTimer = null; persistAppData(); }, 4000);
   }
+  function trackUsage(um){
+    var u = rollUsage();
+    var t = (um && Number(um.totalTokenCount)) || 0;
+    u.calls++; u.totalCalls++; u.mc = (u.mc || 0) + 1; u.tokens += t; u.totalTokens += t; u.mk = (u.mk || 0) + t;
+    queueUsageSave();
+  }
+  function trackTavily(){
+    var u = rollUsage();
+    u.tcalls = (u.tcalls || 0) + 1; u.totalT++; u.mt = (u.mt || 0) + 1;
+    queueUsageSave();
+  }
+  function trackQuotaErr(){
+    var u = rollUsage();
+    u.q = (u.q || 0) + 1;
+    queueUsageSave();
+  }
+
+  // Admin-managed AI settings (config/ai): model, API key, and the limits the admin reads off
+  // AI Studio / Tavily so the dashboard can show what is left. Falls back to the built-in key.
+  function aiKey(){ return (state.aiConfig && state.aiConfig.apiKey) ? state.aiConfig.apiKey : GEMINI_API_KEY; }
+  function aiModelOverride(){ return (state.aiConfig && state.aiConfig.model) ? state.aiConfig.model : null; }
 
   function geminiFetch(prompt, model, jsonMode, allowThinking){
     var limitMsg = aiLimitReason();
     if (limitMsg) return Promise.reject(new Error(limitMsg));
+    model = aiModelOverride() || model;
     var useThinkCfg = !allowThinking && !noThinkCfg[model];
     var body = { contents: [{ parts: [{ text: prompt }] }] };
     var gc = {};
@@ -231,7 +269,7 @@
     if (useThinkCfg) gc.thinkingConfig = { thinkingBudget: 0 };
     if (jsonMode || useThinkCfg) body.generationConfig = gc;
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
-      encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
+      encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(aiKey());
     return fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -244,6 +282,7 @@
             noThinkCfg[model] = true;
             return geminiFetch(prompt, model, jsonMode, allowThinking);
           }
+          if (data.error.code === 429 || res.status === 429 || /quota|RESOURCE_EXHAUSTED/i.test(String(data.error.status || '') + String(data.error.message || ''))) trackQuotaErr();
           throw new Error(data.error.message || 'Gemini API 오류');
         }
         var text;
@@ -258,8 +297,8 @@
     });
   }
 
-  function geminiListModelsDirect(){
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(GEMINI_API_KEY);
+  function geminiListModelsDirect(keyOverride){
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(keyOverride || aiKey());
     return fetch(url).then(function(res){ return res.json(); }).then(function(data){
       if (data.error) throw new Error(data.error.message || 'Gemini API 오류');
       if (!data.models) throw new Error('모델 목록을 받지 못했어요.');
@@ -493,8 +532,8 @@
     apv: { q: '', field: 'all', sort: 'recent' },
     fieldModel: {}, profileField: 'all',
     seenVersion: null, updatePopup: null, updateNew: null,
-    isAdmin: false, announcement: null, annPopup: null, seenAnnouncement: null, limits: { def: null, mine: null },
-    admin: { sub: 'stats', users: null, userLimits: {}, loadingUsers: false, userErr: null, detail: null, groups: null, links: null, loadingGl: false, glErr: null, msg: null, annTitle: '', annBody: '', annUrgent: false, busy: false },
+    aiConfig: null, isAdmin: false, announcement: null, annPopup: null, seenAnnouncement: null, limits: { def: null, mine: null },
+    admin: { sub: 'stats', users: null, userLimits: {}, loadingUsers: false, userErr: null, detail: null, groups: null, links: null, loadingGl: false, glErr: null, msg: null, annTitle: '', annBody: '', annUrgent: false, busy: false, period: 'today', aiForm: null, aiTestBusy: false, aiModels: null },
     retrainMsg: null,
     rescore: { scope: 'old', retrain: true, busy: false, done: 0, total: 0, msg: null },
     sel: {}, selVisible: [], shareModal: null,
@@ -1872,6 +1911,9 @@
   }
 
   async function tavilySearch(query, count){
+    var tl = tavilyLimitReason();
+    if (tl) throw new Error(tl);
+    trackTavily();
     var data = await callFn('tavilySearch', { query: query, maxResults: count });
     if (!data.results) throw new Error('예상치 못한 응답 형식이에요');
     return data.results;
@@ -1979,8 +2021,8 @@
     return true;
   }
 
-  async function listGeminiModels(){
-    return geminiListModelsDirect();
+  async function listGeminiModels(keyOverride){
+    return geminiListModelsDirect(keyOverride);
   }
 
   // Shared scoring rubric. Without anchors the model drifts to a "safe" 60-80
@@ -2227,7 +2269,7 @@
       ['공유 · 그룹', '승인·반려 자료함에서 자료를 체크하면 <b>공유 링크</b>를 만들거나 <b>그룹</b>에 넣을 수 있어요. 링크는 로그인 없이 읽기 전용으로 열려요. 그룹은 학급·동아리처럼 코드를 아는 사람끼리 쓰는 공간이고, 친구가 넣은 자료는 "내 서고에 담기"로 내 대기 목록에 가져와 직접 평가할 수 있어요.'],
       ['상대 비교', '승인한 자료 두 개를 기준별로 맞대어 비교해요. 비교할수록 점수가 더 정교해져요.'],
       ['성향 분석', '분야를 고르면 그 분야에서의 내 기준을 따로 볼 수 있어요(예: 과학은 어려운 자료도 OK, 사회는 쉬운 게 좋아요). <b>AI 예측 적중률</b>(프로그램이 예측한 값과 내 실제 결정이 얼마나 맞았는지), 내가 중요하게 여기는 기준과 반려 이유 분포를 볼 수 있어요. 맨 아래 <b>내 성향 공유하기</b>에서 공유 코드를 만들면, 다른 사람이 분별 수집에서 내 기준을 쓸 수 있어요. 모둠 과제에서 선별 기준을 맞출 때 쓸 수 있어요.'],
-      ['설정', 'AI 모델 선택과 연결 테스트, 데이터 초기화, 계정 관리를 할 수 있어요.']
+      ['설정', 'AI 사용량 확인, 점수 다시 매기기, 데이터 초기화, 계정 관리를 할 수 있어요. AI 모델과 연결은 관리자가 관리해요.']
     ];
     var guideHtml = guide.map(function(g){
       return '<details class="help-acc"><summary>' + g[0] + '</summary><div class="help-body">' + g[1] + '</div></details>';
@@ -2245,7 +2287,7 @@
     var faq = [
       ['카드 평가에 카드가 없다고 나와요', '평가할 자료가 없는 상태예요. <b>자료 추가</b>나 <b>대량 추가</b>에서 자료를 먼저 등록해 주세요.'],
       ['성향 분석이 비어 있어요', '카드를 평가해야 내 기준이 쌓여요. 처음에는 점수 차이가 작을 수 있으니 카드를 여러 장(10장 이상) 평가해 보세요.'],
-      ['수집이나 AI 점수 매기기가 안 돼요', '하루에 쓸 수 있는 AI·검색 횟수에는 한도가 있어요. 한도 오류라면 시간이 지난 뒤 다시 하거나, <b>설정</b>에서 다른 AI 모델을 골라 "연결 테스트"를 해 보세요.'],
+      ['수집이나 AI 점수 매기기가 안 돼요', '하루에 쓸 수 있는 AI·검색 횟수에는 한도가 있어요. 한도 오류라면 시간이 지난 뒤 다시 하거나 관리자에게 알려주세요. <b>설정</b>의 AI 사용량에서 오늘 남은 횟수를 볼 수 있어요.'],
       ['내 자료를 다른 사람이 볼 수 있나요?', '다른 사용자는 내가 직접 공유하기 전에는 볼 수 없어요. 공유 링크나 그룹에 넣은 자료, 성향 공유로 내보낸 내용만 상대가 볼 수 있고, 이메일은 어디에도 공유되지 않아요. 공유 링크는 "공유 · 그룹" 메뉴에서 언제든 중단할 수 있어요. 다만 <b>서비스를 운영하고 문제를 해결하기 위해 관리자는</b> 사용 현황(자료 수, AI 사용량, 마지막 접속)을 볼 수 있고, 꼭 필요할 때는 자료·평가 기록도 열람할 수 있어요.']
     ];
     var faqHtml = faq.map(function(g){
@@ -3406,33 +3448,7 @@
       limitLineHtml() +
       '<p class="sm-hint" style="margin:0;">토큰을 아끼도록 AI에는 짧은 요약만 보내고 점수는 숫자로만 받아요. 자주 반려한 출처는 AI에 묻지 않고 먼저 제외하고, 적중률 계산·카드 학습·상대 비교는 AI 없이 처리해요. 수집 개수를 필요한 만큼만 정하면 더 아낄 수 있어요.</p></div>';
 
-    var gs = state.geminiSettings || { model: 'gemini-2.5-flash' };
-    html += '<div class="acct-block"><div class="acct-label">Gemini 모델 선택</div>' +
-      '<p style="font-size:14px;color:var(--cream-soft);margin:0 0 12px;">AI 채점·AI 요약에서 Gemini 엔진을 고르면 이 모델이 사용됩니다. 서버에 등록된 키로 실제 사용 가능한 모델 목록을 불러올 수 있어요.</p>' +
-      '<div class="field"><label>모델명</label><input type="text" id="settings-gemini-model" placeholder="gemini-2.5-flash" value="' + escapeHtml(gs.model||'gemini-2.5-flash') + '" /></div>' +
-      '<button class="btn ghost small" id="gemini-list-models" style="margin-bottom:12px;" ' + (state.geminiModelListLoading?'disabled':'') + '>' + (state.geminiModelListLoading ? '불러오는 중...' : '사용 가능한 모델 확인') + '</button>';
-
-    if (state.geminiModelList){
-      if (state.geminiModelList.length === 0){
-        html += '<p style="font-size:14px;color:var(--reject);margin:-6px 0 12px;">서버에 등록된 키로 사용 가능한 생성 모델이 없어요. 관리자에게 문의해주세요.</p>';
-      } else {
-        html += '<div style="font-size:13px;text-transform:uppercase;letter-spacing:0.05em;font-family:var(--font-mono);color:var(--cream-soft);margin-bottom:6px;">사용 가능한 모델 (' + state.geminiModelList.length + '개) — 클릭해서 선택</div>' +
-          '<div class="model-list">' +
-          state.geminiModelList.map(function(m){
-            var active = gs.model === m.name;
-            return '<button type="button" class="model-list-item' + (active ? ' active' : '') + '" data-model-name="' + escapeHtml(m.name) + '">' +
-              '<span class="mn">' + escapeHtml(m.name) + '</span>' +
-              (m.displayName && m.displayName !== m.name ? '<span class="md">' + escapeHtml(m.displayName) + '</span>' : '') +
-              (active ? '<span class="mc">✓ 선택됨</span>' : '') +
-            '</button>';
-          }).join('') +
-          '</div>';
-      }
-    }
-    html += (state.geminiMsg ? '<p class="acct-msg ' + state.geminiMsg.type + '">' + escapeHtml(state.geminiMsg.text) + '</p>' : '') +
-      '<div style="display:flex;gap:8px;">' +
-        '<button class="btn ghost small" id="gemini-save" ' + (state.geminiTestLoading?'disabled':'') + '>' + (state.geminiTestLoading ? '연결 확인 중...' : '모델 저장하기') + '</button>' +
-      '</div></div>';
+    html += '<div class="acct-block"><div class="acct-label">AI 엔진</div><p style="font-size:14.5px;line-height:1.7;color:var(--cream-soft);margin:0;">사용하는 AI 모델과 연결은 관리자가 관리해요. 따로 설정할 건 없어요.' + (state.aiConfig && state.aiConfig.model ? ' (현재 모델: ' + escapeHtml(state.aiConfig.model) + ')' : '') + '</p></div>';
 
     var st = storageStats();
     var kb = function(b){ return b < 1024 * 1024 ? Math.max(1, Math.round(b / 1024)) + 'KB' : (b / 1048576).toFixed(1) + 'MB'; };
@@ -4309,77 +4325,6 @@
       render();
     });
 
-    // settings: Gemini model
-    var geminiListBtn = document.getElementById('gemini-list-models');
-    if (geminiListBtn) geminiListBtn.addEventListener('click', function(){
-      state.geminiModelListLoading = true;
-      state.geminiMsg = null;
-      render();
-      listGeminiModels().then(function(models){
-        state.geminiModelListLoading = false;
-        state.geminiModelList = models;
-        state.geminiMsg = { type:'ok', text: models.length + '개 모델을 찾았어요. 아래에서 골라주세요.' };
-        render();
-      }).catch(function(err){
-        state.geminiModelListLoading = false;
-        state.geminiModelList = null;
-        state.geminiMsg = { type:'err', text: '모델 목록을 불러오지 못했어요: ' + (err && err.message ? err.message : '오류') };
-        render();
-      });
-    });
-    document.querySelectorAll('.model-list-item').forEach(function(item){
-      item.addEventListener('click', function(){
-        var name = item.getAttribute('data-model-name');
-        var modelInput = document.getElementById('settings-gemini-model');
-        if (modelInput) modelInput.value = name;
-        document.querySelectorAll('.model-list-item').forEach(function(el){
-          el.classList.remove('active');
-          var mc = el.querySelector('.mc');
-          if (mc) mc.remove();
-        });
-        item.classList.add('active');
-        var span = document.createElement('span');
-        span.className = 'mc';
-        span.textContent = '✓ 선택됨';
-        item.appendChild(span);
-      });
-    });
-    var geminiSaveBtn = document.getElementById('gemini-save');
-    if (geminiSaveBtn) geminiSaveBtn.addEventListener('click', function(){
-      var model = document.getElementById('settings-gemini-model').value.trim() || 'gemini-2.5-flash';
-      state.geminiSettings = { model: model };
-      saveGeminiSettings();
-      state.geminiTestLoading = true;
-      state.geminiModelListLoading = true;
-      state.geminiMsg = { type:'ok', text:'저장했어요. 연결 확인과 모델 목록을 함께 불러오는 중...' };
-      render();
-
-      Promise.allSettled([
-        testGeminiConnection(model),
-        listGeminiModels()
-      ]).then(function(results){
-        state.geminiTestLoading = false;
-        state.geminiModelListLoading = false;
-        var testResult = results[0];
-        var listResult = results[1];
-
-        if (listResult.status === 'fulfilled'){
-          state.geminiModelList = listResult.value;
-        }
-
-        if (testResult.status === 'fulfilled'){
-          var countNote = listResult.status === 'fulfilled' ? (' (이 키로 총 ' + listResult.value.length + '개 모델 사용 가능)') : '';
-          state.geminiMsg = { type:'ok', text:'저장 완료 — 연결 확인됨, "' + model + '" 모델이 정상 동작해요 ✓' + countNote };
-        } else {
-          var err = testResult.reason;
-          var hint = err && err.status === 404
-            ? ' 아래 목록에서 실제 사용 가능한 모델을 골라 다시 저장해주세요.'
-            : '';
-          state.geminiMsg = { type:'err', text:'설정은 저장됐지만 연결 확인에 실패했어요 (' + (err && err.message ? err.message : '오류') + ').' + hint };
-        }
-        render();
-      });
-    });
     // account management
     function reauthenticate(currentPassword){
       var cred = firebase.auth.EmailAuthProvider.credential(state.user.email, currentPassword);
@@ -4490,6 +4435,7 @@
       pageCache = {};
       currentSavePromise = Promise.resolve();
       stopAnnouncementWatch();
+      state.aiConfig = null; state.admin.aiForm = null; state.admin.aiModels = null;
       state.isAdmin = false; state.announcement = null; state.annPopup = null; state.limits = { def: null, mine: null };
       state.admin.users = null; state.admin.detail = null; state.admin.groups = null; state.admin.links = null; state.admin.msg = null; state.admin.sub = 'stats';
       if (user){
@@ -4524,13 +4470,51 @@
     return (err && err.message) || '오류가 났어요.';
   }
   function userLabel(u){ return (u.name && String(u.name).trim()) ? String(u.name).trim() : ('이름 없음 · ' + String(u.id || '').slice(0, 6)); }
-  function usageToday(u){ var x = u && u.usage; return (x && x.day === todayKey()) ? x : { calls: 0, tokens: 0 }; }
+  function usageToday(u){ var x = u && u.usage; return (x && x.day === todayKey()) ? x : { calls: 0, tokens: 0, t: 0, q: 0 }; }
+  function usageMonth(u){ var x = u && u.usage; return (x && x.mon === todayKey().slice(0, 7)) ? x : { mc: 0, mk: 0, mt: 0 }; }
+  // one number set per user for the selected period: g = AI calls, t = Tavily calls, k = tokens
+  function periodUsage(u, period){
+    var x = (u && u.usage) || {};
+    if (period === 'month'){ var m = usageMonth(u); return { g: m.mc || 0, t: m.mt || 0, k: m.mk || 0 }; }
+    if (period === 'all') return { g: x.totalCalls || 0, t: x.totalT || 0, k: x.totalTokens || 0 };
+    var d = usageToday(u); return { g: d.calls || 0, t: d.t || 0, k: d.tokens || 0 };
+  }
+  var C_G = 'var(--gold)', C_T = '#5FB3A1';
+  function barHtml(val, max, color){
+    var w = max > 0 ? Math.max(val > 0 ? 2 : 0, Math.round(val / max * 100)) : 0;
+    return '<div style="height:10px;background:rgba(243,238,223,0.08);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + w + '%;background:' + color + ';"></div></div>';
+  }
+  function remainHtml(label, used, cap, color, note){
+    if (!cap) return '<div style="margin-bottom:14px;"><b>' + label + '</b> <span class="sm-hint">' + used + '회 사용 · ' + note + '</span></div>';
+    var left = Math.max(0, cap - used), pct = Math.min(100, Math.round(used / cap * 100));
+    var warn = pct >= 90 ? 'var(--reject)' : color;
+    return '<div style="margin-bottom:16px;"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:5px;"><b>' + label + '</b>' +
+      '<span>남은 <b style="color:' + (pct >= 90 ? 'var(--reject)' : 'var(--cream)') + ';">' + left + '회</b> <span style="color:var(--cream-soft);">(' + used + ' / ' + cap + '회, ' + pct + '%)</span></span></div>' +
+      '<div style="height:12px;background:rgba(243,238,223,0.08);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + warn + ';"></div></div></div>';
+  }
 
   function effectiveDailyLimit(){
     var mine = state.limits.mine || {};
     if (typeof mine.dailyCalls === 'number' && mine.dailyCalls >= 0) return mine.dailyCalls;
     var d = state.limits.def || {};
     return (typeof d.dailyCalls === 'number' && d.dailyCalls > 0) ? d.dailyCalls : null;
+  }
+  function effectiveDailyTavily(){
+    var mine = state.limits.mine || {};
+    if (typeof mine.dailyTavily === 'number' && mine.dailyTavily >= 0) return mine.dailyTavily;
+    var d = state.limits.def || {};
+    return (typeof d.dailyTavily === 'number' && d.dailyTavily > 0) ? d.dailyTavily : null;
+  }
+  function tavilyLimitReason(){
+    if (state.isAdmin) return null;
+    var mine = state.limits.mine || {};
+    if (mine.blocked) return '관리자가 이 계정의 AI·검색 사용을 잠시 막아 두었어요.';
+    var lim = effectiveDailyTavily();
+    if (lim === null) return null;
+    var u = state.aiUsage;
+    var used = (u && u.day === todayKey()) ? (u.tcalls || 0) : 0;
+    if (used >= lim) return '오늘 검색 사용 한도(' + lim + '회)에 도달했어요. 내일 다시 쓸 수 있어요.';
+    return null;
   }
   function aiLimitReason(){
     if (state.isAdmin) return null;
@@ -4547,19 +4531,23 @@
     if (state.isAdmin) return '<p class="sm-hint" style="margin:0 0 8px;">관리자 계정은 AI 사용 한도가 적용되지 않아요.</p>';
     var mine = state.limits.mine || {};
     if (mine.blocked) return '<p class="sm-hint" style="margin:0 0 8px;color:var(--reject);">관리자가 이 계정의 AI 사용을 잠시 막아 두었어요.</p>';
-    var lim = effectiveDailyLimit();
-    if (lim === null) return '';
-    var u = state.aiUsage;
-    var used = (u && u.day === todayKey()) ? u.calls : 0;
-    return '<p class="sm-hint" style="margin:0 0 8px;">관리자가 정한 하루 한도: <b>' + lim + '회</b> · 오늘 남은 횟수 <b>' + Math.max(0, lim - used) + '회</b></p>';
+    var lim = effectiveDailyLimit(), tl = effectiveDailyTavily();
+    var u = state.aiUsage, today = (u && u.day === todayKey());
+    var out = '';
+    if (lim !== null) out += '<p class="sm-hint" style="margin:0 0 8px;">관리자가 정한 하루 AI 한도: <b>' + lim + '회</b> · 오늘 남은 횟수 <b>' + Math.max(0, lim - (today ? u.calls : 0)) + '회</b></p>';
+    if (tl !== null) out += '<p class="sm-hint" style="margin:0 0 8px;">관리자가 정한 하루 검색 한도: <b>' + tl + '회</b> · 오늘 남은 횟수 <b>' + Math.max(0, tl - (today ? (u.tcalls || 0) : 0)) + '회</b></p>';
+    return out;
   }
 
-  var userIndexAt = 0;
+  var userIndexAt = 0, userIndexTimer = null;
   // Counts only (no titles, no email): lets the admin see who is using the app and how much.
   function touchUserIndex(force){
     if (!state.user || !state.loaded || typeof fbDb === 'undefined' || !fbDb) return;
     var now = Date.now();
-    if (!force && now - userIndexAt < 60000) return;
+    if (!force && now - userIndexAt < 60000){
+      if (!userIndexTimer) userIndexTimer = setTimeout(function(){ userIndexTimer = null; touchUserIndex(true); }, 60000 - (now - userIndexAt) + 500);
+      return;
+    }
     userIndexAt = now;
     var a = 0, r = 0, pn = 0;
     state.materials.forEach(function(m){ if (m.status === 'approved') a++; else if (m.status === 'rejected') r++; else pn++; });
@@ -4567,7 +4555,10 @@
     var doc = {
       name: (state.displayName || '').slice(0, 30),
       counts: { a: a, r: r, p: pn }, total: state.materials.length,
-      usage: { day: u.day || null, calls: u.calls || 0, tokens: u.tokens || 0, totalCalls: u.totalCalls || 0, totalTokens: u.totalTokens || 0 },
+      usage: { day: u.day || null, calls: u.calls || 0, tokens: u.tokens || 0, t: u.tcalls || 0, q: u.q || 0,
+               mon: u.mon || null, mc: u.mc || 0, mk: u.mk || 0, mt: u.mt || 0,
+               totalCalls: u.totalCalls || 0, totalTokens: u.totalTokens || 0, totalT: u.totalT || 0,
+               hist: Array.isArray(u.hist) ? u.hist.slice(-7) : [] },
       links: (state.sharedLinks || []).length, ver: APP_VERSION, lastSeen: now
     };
     try { fbDb.collection('user_index').doc(state.user.uid).set(doc).catch(function(){}); } catch(e){}
@@ -4608,6 +4599,7 @@
     var jobs = [
       fbDb.collection('admins').doc(uid0).get().then(function(sn){ state.isAdmin = !!sn.exists; }).catch(function(){}),
       watchAnnouncement(),
+      fbDb.collection('config').doc('ai').get().then(function(sn){ state.aiConfig = sn.exists ? sn.data() : null; }).catch(function(){}),
       fbDb.collection('config').doc('limits').get().then(function(sn){ state.limits.def = sn.exists ? sn.data() : null; }).catch(function(){}),
       fbDb.collection('user_limits').doc(uid0).get().then(function(sn){ state.limits.mine = sn.exists ? sn.data() : null; }).catch(function(){})
     ];
@@ -4687,26 +4679,32 @@
   function adminSaveLimit(uid0){
     var ad = state.admin;
     var callsRaw = (document.getElementById('ad-lim-calls') || {}).value;
+    var tavRaw = (document.getElementById('ad-lim-tav') || {}).value;
     var blocked = !!(document.getElementById('ad-lim-block') || {}).checked;
     var data = { blocked: blocked, updatedAt: Date.now() };
-    var n = parseInt(callsRaw, 10);
+    var n = parseInt(callsRaw, 10), nt = parseInt(tavRaw, 10);
     if (callsRaw !== '' && callsRaw != null){
       if (isNaN(n) || n < 0 || n > 100000){ ad.msg = { type: 'err', text: '횟수는 0 이상의 숫자로 적어주세요.' }; render(); return; }
       data.dailyCalls = n;
     }
+    if (tavRaw !== '' && tavRaw != null){
+      if (isNaN(nt) || nt < 0 || nt > 100000){ ad.msg = { type: 'err', text: '횟수는 0 이상의 숫자로 적어주세요.' }; render(); return; }
+      data.dailyTavily = nt;
+    }
     var ref = fbDb.collection('user_limits').doc(uid0);
-    var job = (!blocked && data.dailyCalls === undefined) ? ref.delete().then(function(){ delete ad.userLimits[uid0]; }) : ref.set(data).then(function(){ ad.userLimits[uid0] = data; });
+    var job = (!blocked && data.dailyCalls === undefined && data.dailyTavily === undefined) ? ref.delete().then(function(){ delete ad.userLimits[uid0]; }) : ref.set(data).then(function(){ ad.userLimits[uid0] = data; });
     job.then(function(){ ad.msg = { type: 'ok', text: '한도를 저장했어요.' }; render(); })
        .catch(function(err){ ad.msg = { type: 'err', text: adminErrMsg(err) }; render(); });
   }
   function adminSaveDefault(){
     var ad = state.admin;
     var raw = (document.getElementById('ad-def-calls') || {}).value;
-    var n = parseInt(raw, 10);
-    var data = { updatedAt: Date.now(), dailyCalls: (raw === '' || isNaN(n) || n <= 0) ? null : n };
-    if (raw !== '' && (isNaN(n) || n < 0 || n > 100000)){ ad.msg = { type: 'err', text: '횟수는 숫자로 적어주세요.' }; render(); return; }
+    var rawT = (document.getElementById('ad-def-tav') || {}).value;
+    var n = parseInt(raw, 10), nt = parseInt(rawT, 10);
+    if ((raw !== '' && (isNaN(n) || n < 0 || n > 100000)) || (rawT !== '' && (isNaN(nt) || nt < 0 || nt > 100000))){ ad.msg = { type: 'err', text: '횟수는 숫자로 적어주세요.' }; render(); return; }
+    var data = { updatedAt: Date.now(), dailyCalls: (raw === '' || isNaN(n) || n <= 0) ? null : n, dailyTavily: (rawT === '' || isNaN(nt) || nt <= 0) ? null : nt };
     fbDb.collection('config').doc('limits').set(data).then(function(){
-      state.limits.def = data; ad.msg = { type: 'ok', text: data.dailyCalls ? ('기본 한도를 하루 ' + data.dailyCalls + '회로 정했어요.') : '기본 한도를 없앴어요.' }; render();
+      state.limits.def = data; ad.msg = { type: 'ok', text: '기본 한도를 저장했어요 (AI ' + (data.dailyCalls ? '하루 ' + data.dailyCalls + '회' : '제한 없음') + ' · 검색 ' + (data.dailyTavily ? '하루 ' + data.dailyTavily + '회' : '제한 없음') + ').' }; render();
     }).catch(function(err){ ad.msg = { type: 'err', text: adminErrMsg(err) }; render(); });
   }
   function adminPostAnn(){
@@ -4768,7 +4766,7 @@
   function adminTabHtml(){
     var ad = state.admin;
     if (!state.isAdmin) return '<div class="empty"><h3>관리자만 볼 수 있어요</h3></div>';
-    var subs = [['stats', '현황'], ['users', '사용자'], ['ann', '공지'], ['groups', '그룹 · 링크']];
+    var subs = [['stats', '현황'], ['users', '사용자'], ['ai', 'AI 설정'], ['ann', '공지'], ['groups', '그룹 · 링크']];
     var html = '<p class="section-title">관리자</p>' +
       '<div class="compare-controls"><div class="mode-toggle">' + subs.map(function(x){
         return '<button data-adsub="' + x[0] + '" class="' + (ad.sub === x[0] ? 'active' : '') + '">' + x[1] + '</button>';
@@ -4776,6 +4774,7 @@
     if (ad.msg) html += '<p class="acct-msg ' + ad.msg.type + '" style="margin:0 0 14px;">' + escapeHtml(ad.msg.text) + '</p>';
     if (ad.sub === 'stats') html += adminStatsHtml();
     else if (ad.sub === 'users') html += adminUsersHtml();
+    else if (ad.sub === 'ai') html += adminAiHtml();
     else if (ad.sub === 'ann') html += adminAnnHtml();
     else html += adminGlHtml();
     return html;
@@ -4790,29 +4789,81 @@
   function adminStatsHtml(){
     var ad = state.admin, users = ad.users || [];
     var startToday = new Date(); startToday.setHours(0, 0, 0, 0);
-    var activeToday = 0, calls = 0, tokens = 0, totalTokens = 0, mats = 0;
+    var activeToday = 0, calls = 0, tokens = 0, tcalls = 0, quota = 0, mT = 0, mats = 0;
     users.forEach(function(u){
       if ((u.lastSeen || 0) >= startToday.getTime()) activeToday++;
-      var t = usageToday(u); calls += t.calls || 0; tokens += t.tokens || 0;
-      totalTokens += (u.usage && u.usage.totalTokens) || 0; mats += u.total || 0;
+      var t = usageToday(u); calls += t.calls || 0; tokens += t.tokens || 0; tcalls += t.t || 0; quota += t.q || 0;
+      mT += usageMonth(u).mt || 0; mats += u.total || 0;
     });
     var fmtTok = function(n){ return n >= 10000 ? (n / 1000).toFixed(0) + 'K' : String(n); };
     var card = function(label, val){ return '<div class="help-step"><span class="no">' + label + '</span><h4>' + val + '</h4></div>'; };
-    var def = state.limits.def && typeof state.limits.def.dailyCalls === 'number' ? state.limits.def.dailyCalls : '';
+    var cfg = state.aiConfig || {};
+    var def = state.limits.def || {};
+    var periods = [['today', '오늘'], ['month', '이번 달'], ['all', '누적']];
+    var P = ad.period || 'today';
+    var rows = users.map(function(u){ var x = periodUsage(u, P); return { u: u, g: x.g, t: x.t, k: x.k }; })
+      .filter(function(r){ return r.g > 0 || r.t > 0; })
+      .sort(function(a, b){ return (b.g + b.t) - (a.g + a.t); });
+    var maxV = 0; rows.forEach(function(r){ maxV = Math.max(maxV, r.g, r.t); });
+    var chart = '';
+    rows.slice(0, 12).forEach(function(r){
+      chart += '<div style="display:grid;grid-template-columns:minmax(80px,140px) 1fr;gap:6px 12px;align-items:center;margin-bottom:10px;">' +
+        '<div style="font-size:14px;line-height:1.3;word-break:break-all;">' + escapeHtml(userLabel(r.u)) + '</div>' +
+        '<div>' + barHtml(r.g, maxV, C_G) + '<div style="height:3px;"></div>' + barHtml(r.t, maxV, C_T) +
+        '<div style="font-size:12.5px;color:var(--cream-soft);margin-top:3px;">AI <b style="color:var(--cream);">' + r.g + '회</b> · 검색 <b style="color:var(--cream);">' + r.t + '회</b> · 토큰 ' + fmtTok(r.k) + '</div></div></div>';
+    });
+    if (!rows.length) chart = '<p class="sm-hint">이 기간에 사용 기록이 없어요.</p>';
+    else if (rows.length > 12) chart += '<p class="sm-hint">상위 12명만 표시했어요 (사용한 사람 ' + rows.length + '명).</p>';
+
+    // last 7 days, summed across users
+    var days = [];
+    for (var i = 6; i >= 0; i--){ var d = new Date(); d.setDate(d.getDate() - i); days.push(d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2)); }
+    var sumG = {}, sumT = {};
+    users.forEach(function(u){
+      var x = u.usage || {};
+      var entries = (Array.isArray(x.hist) ? x.hist : []).map(function(h){ return { d: h.d, c: h.c || 0, t: h.t || 0 }; });
+      if (x.day) entries.push({ d: x.day, c: x.calls || 0, t: x.t || 0 });
+      var seenDay = {};
+      entries.forEach(function(e){ if (seenDay[e.d]) return; seenDay[e.d] = true; sumG[e.d] = (sumG[e.d] || 0) + e.c; sumT[e.d] = (sumT[e.d] || 0) + e.t; });
+    });
+    var maxD = 0; days.forEach(function(d){ maxD = Math.max(maxD, sumG[d] || 0, sumT[d] || 0); });
+    var trend = '<div style="display:flex;align-items:flex-end;gap:8px;height:130px;margin:6px 0 4px;">' + days.map(function(d){
+      var g = sumG[d] || 0, t = sumT[d] || 0;
+      var hg = maxD ? Math.round(g / maxD * 100) : 0, ht = maxD ? Math.round(t / maxD * 100) : 0;
+      return '<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;min-width:0;" title="' + d + ' · AI ' + g + '회 · 검색 ' + t + '회">' +
+        '<div style="display:flex;align-items:flex-end;gap:2px;height:100px;"><div style="flex:1;height:' + hg + '%;min-height:' + (g ? 2 : 0) + 'px;background:' + C_G + ';border-radius:2px 2px 0 0;"></div>' +
+        '<div style="flex:1;height:' + ht + '%;min-height:' + (t ? 2 : 0) + 'px;background:' + C_T + ';border-radius:2px 2px 0 0;"></div></div>' +
+        '<div style="font-size:11.5px;color:var(--cream-soft);text-align:center;margin-top:4px;">' + d.slice(5).replace('-', '/') + '</div>' +
+        '<div style="font-size:11.5px;text-align:center;">' + g + '·' + t + '</div></div>';
+    }).join('') + '</div>';
+
+    var legend = '<div style="display:flex;gap:16px;font-size:13px;color:var(--cream-soft);margin:0 0 12px;"><span><span style="display:inline-block;width:10px;height:10px;background:' + C_G + ';border-radius:2px;margin-right:5px;"></span>AI(Gemini) 호출</span><span><span style="display:inline-block;width:10px;height:10px;background:' + C_T + ';border-radius:2px;margin-right:5px;"></span>검색(Tavily) 호출</span></div>';
+
     return adminLoadingOrErr() +
-      '<div class="help-steps" style="margin-bottom:22px;">' +
+      '<div class="acct-block"><div class="acct-label">남은 한도</div>' +
+        remainHtml('AI(Gemini) · 오늘', calls, cfg.geminiDaily || 0, C_G, '프로젝트 하루 한도를 "AI 설정"에서 입력하면 남은 횟수를 보여줘요') +
+        remainHtml('검색(Tavily) · 이번 달 크레딧', mT, cfg.tavilyMonthly || 0, C_T, '월 크레딧을 "AI 설정"에서 입력하면 남은 횟수를 보여줘요') +
+        '<p class="sm-hint" style="margin:0;">이 앱을 거친 호출만 집계돼요 (사용자가 접속해 저장될 때 갱신, 최대 1~2분 지연). 정확한 잔여량은 Google AI Studio와 Tavily 대시보드에서 확인하세요.' + (quota ? ' <b style="color:var(--reject);">오늘 한도 오류(429) ' + quota + '회</b>가 있었어요.' : '') + '</p></div>' +
+      '<div class="help-steps" style="margin:0 0 22px;">' +
         card('사용자', users.length + '명') + card('오늘 접속', activeToday + '명') +
-        card('오늘 AI 호출', calls + '회') + card('오늘 토큰', fmtTok(tokens)) +
-        card('누적 토큰', fmtTok(totalTokens)) + card('전체 자료', mats + '개') +
+        card('오늘 AI 호출', calls + '회') + card('오늘 검색', tcalls + '회') +
+        card('오늘 토큰', fmtTok(tokens)) + card('전체 자료', mats + '개') +
       '</div>' +
-      '<p class="sm-hint">목록은 이 업데이트를 받은 뒤 <b>한 번 이상 접속한 사용자</b>부터 보여요. 오늘 수치는 마지막으로 접속한 시점까지의 값이에요.</p>' +
-      '<div class="acct-block"><div class="acct-label">모든 사용자의 기본 AI 한도</div>' +
-        '<p style="font-size:14.5px;line-height:1.7;color:var(--cream-soft);margin:0 0 10px;">하루에 쓸 수 있는 AI 호출 횟수예요. 비워 두면 한도가 없어요. 사용자마다 따로 정한 값이 있으면 그 값이 우선해요.</p>' +
-        '<div class="field" style="max-width:220px;"><label>하루 호출 횟수</label><input type="number" min="0" id="ad-def-calls" placeholder="한도 없음" value="' + def + '"></div>' +
+      '<div class="acct-block"><div class="acct-label">누가 얼마나 썼나</div>' +
+        '<div class="compare-controls" style="margin-bottom:12px;"><div class="mode-toggle">' + periods.map(function(x){
+          return '<button data-adperiod="' + x[0] + '" class="' + (P === x[0] ? 'active' : '') + '">' + x[1] + '</button>';
+        }).join('') + '</div></div>' + legend + chart + '</div>' +
+      '<div class="acct-block"><div class="acct-label">최근 7일 (막대 아래 숫자: AI·검색)</div>' + legend + trend + '</div>' +
+      '<p class="sm-hint">목록은 이 업데이트를 받은 뒤 <b>한 번 이상 접속한 사용자</b>부터 보여요. 7일 추이는 이 버전부터 쌓여요.</p>' +
+      '<div class="acct-block"><div class="acct-label">모든 사용자의 기본 하루 한도</div>' +
+        '<p style="font-size:14.5px;line-height:1.7;color:var(--cream-soft);margin:0 0 10px;">비워 두면 한도가 없어요. 사용자마다 따로 정한 값이 있으면 그 값이 우선해요.</p>' +
+        '<div class="field-row"><div class="field" style="max-width:220px;"><label>AI 하루 호출 횟수</label><input type="number" min="0" id="ad-def-calls" placeholder="한도 없음" value="' + (typeof def.dailyCalls === 'number' ? def.dailyCalls : '') + '"></div>' +
+        '<div class="field" style="max-width:220px;"><label>검색 하루 호출 횟수</label><input type="number" min="0" id="ad-def-tav" placeholder="한도 없음" value="' + (typeof def.dailyTavily === 'number' ? def.dailyTavily : '') + '"></div></div>' +
         '<button class="btn small" id="ad-def-save">저장</button> ' +
         '<button class="btn ghost small" id="ad-refresh">새로고침</button>' +
         '<p class="sm-hint" style="margin-top:10px;">한도는 사용자의 브라우저에서 확인하는 방식이라 일반적인 사용을 조절하는 용도예요. 일부러 우회하는 것까지 막지는 못해요.</p></div>';
   }
+
   function adminUsersHtml(){
     var ad = state.admin, users = ad.users || [];
     if (ad.detail) return adminUserDetailHtml();
@@ -4822,9 +4873,9 @@
       var t = usageToday(u), lim = ad.userLimits[u.id];
       html += '<button type="button" class="acct-block" data-aduser="' + escapeHtml(u.id) + '" style="' + AD_ROW + 'cursor:pointer;color:inherit;font:inherit;">' +
         '<b style="min-width:120px;">' + escapeHtml(userLabel(u)) + '</b>' +
-        '<span>자료 ' + (u.total || 0) + '개</span><span>오늘 AI ' + (t.calls || 0) + '회</span>' +
+        '<span>자료 ' + (u.total || 0) + '개</span><span>오늘 AI ' + (t.calls || 0) + '회 · 검색 ' + (t.t || 0) + '회</span>' +
         '<span style="color:var(--cream-soft);">접속 ' + adminFmt(u.lastSeen) + '</span>' +
-        (lim ? '<span style="color:var(--gold);">' + (lim.blocked ? '차단됨' : ('한도 ' + (typeof lim.dailyCalls === 'number' ? lim.dailyCalls + '회' : '')) ) + '</span>' : '') +
+        (lim ? '<span style="color:var(--gold);">' + (lim.blocked ? '차단됨' : ('한도 ' + [typeof lim.dailyCalls === 'number' ? 'AI ' + lim.dailyCalls : '', typeof lim.dailyTavily === 'number' ? '검색 ' + lim.dailyTavily : ''].filter(Boolean).join(' · '))) + '</span>' : '') +
       '</button>';
     });
     if (!users.length && !ad.loadingUsers) html += '<p class="sm-hint">아직 목록에 사용자가 없어요.</p>';
@@ -4840,12 +4891,13 @@
       '<div class="acct-block"><div class="acct-label">' + escapeHtml(userLabel(u)) + '</div>' +
       '<p style="font-size:14.5px;line-height:1.8;color:var(--cream-soft);margin:0;">' +
         '자료 ' + (u.total || 0) + '개 (승인 ' + (c.a || 0) + ' · 반려 ' + (c.r || 0) + ' · 대기 ' + (c.p || 0) + ')<br>' +
-        '오늘 AI ' + (t.calls || 0) + '회 · 누적 ' + (uu.totalCalls || 0) + '회 / ' + (uu.totalTokens || 0) + ' 토큰<br>' +
+        '오늘 AI ' + (t.calls || 0) + '회 · 검색 ' + (t.t || 0) + '회 · 누적 AI ' + (uu.totalCalls || 0) + '회 / ' + (uu.totalTokens || 0) + ' 토큰 / 검색 ' + (uu.totalT || 0) + '회<br>' +
         '공유 링크 ' + (u.links || 0) + '개 · 앱 버전 ' + escapeHtml(u.ver || '-') + ' · 마지막 접속 ' + adminFmt(u.lastSeen) + '<br>' +
         '<span style="font-size:12.5px;">계정 ID ' + escapeHtml(d.uid) + '</span></p></div>' +
       '<div class="acct-block"><div class="acct-label">이 사용자의 AI 한도</div>' +
         '<div class="field" style="max-width:220px;"><label>하루 호출 횟수 (비우면 기본값)</label><input type="number" min="0" id="ad-lim-calls" value="' + (typeof lim.dailyCalls === 'number' ? lim.dailyCalls : '') + '"></div>' +
-        '<div class="toggle-row"><input type="checkbox" id="ad-lim-block" ' + (lim.blocked ? 'checked' : '') + '><label for="ad-lim-block" style="margin:0;">AI 사용 완전히 막기</label></div>' +
+        '<div class="field" style="max-width:220px;"><label>검색 하루 호출 횟수 (비우면 기본값)</label><input type="number" min="0" id="ad-lim-tav" value="' + (typeof lim.dailyTavily === 'number' ? lim.dailyTavily : '') + '"></div>' +
+        '<div class="toggle-row"><input type="checkbox" id="ad-lim-block" ' + (lim.blocked ? 'checked' : '') + '><label for="ad-lim-block" style="margin:0;">AI·검색 사용 완전히 막기</label></div>' +
         '<button class="btn small" id="ad-lim-save" data-uid="' + escapeHtml(d.uid) + '">저장</button></div>';
     html += '<div class="acct-block"><div class="acct-label">자료·평가 기록 (읽기 전용)</div>' +
       '<p class="sm-hint" style="margin:0 0 10px;">서비스 운영과 문제 해결에 필요할 때만 열람해주세요. 수정·삭제는 할 수 없어요.</p>';
@@ -4867,6 +4919,77 @@
       });
     }
     return html + '</div>';
+  }
+  function maskKey(k){ return k ? ('…' + String(k).slice(-4)) : ''; }
+  function adminAiHtml(){
+    var ad = state.admin, cfg = state.aiConfig || {};
+    var f = ad.aiForm || (ad.aiForm = { model: cfg.model || '', key: '', geminiDaily: cfg.geminiDaily || '', tavilyMonthly: cfg.tavilyMonthly || '' });
+    var html = '<div class="acct-block"><div class="acct-label">Gemini (AI 채점·요약)</div>' +
+      '<p style="font-size:14.5px;line-height:1.7;color:var(--cream-soft);margin:0 0 12px;">여기서 정한 모델과 키가 <b style="color:var(--cream);">모든 사용자에게</b> 적용돼요. 사용자는 설정할 필요가 없어요. 저장하기 전에 연결을 먼저 확인해요.</p>' +
+      '<div class="field"><label>모델명</label><input type="text" id="ad-ai-model" placeholder="예: gemini-3.1-flash-lite" value="' + escapeHtml(f.model) + '"></div>' +
+      '<div style="margin-bottom:12px;"><button class="btn ghost small" id="ad-ai-list" ' + (ad.aiTestBusy ? 'disabled' : '') + '>사용 가능한 모델 확인</button></div>';
+    if (ad.aiModels){
+      html += ad.aiModels.length ? '<div class="model-list" style="margin-bottom:12px;">' + ad.aiModels.map(function(m){
+        return '<button type="button" class="model-list-item' + (f.model === m.name ? ' active' : '') + '" data-ad-model="' + escapeHtml(m.name) + '"><span class="mn">' + escapeHtml(m.name) + '</span>' + (m.displayName && m.displayName !== m.name ? '<span class="md">' + escapeHtml(m.displayName) + '</span>' : '') + '</button>';
+      }).join('') + '</div>' : '<p class="sm-hint">사용 가능한 모델이 없어요.</p>';
+    }
+    html += '<div class="field"><label>Gemini API 키</label><input type="password" id="ad-ai-key" autocomplete="off" placeholder="' + (cfg.apiKey ? ('저장된 키 ' + maskKey(cfg.apiKey) + ' · 바꿀 때만 입력') : '비워 두면 코드에 들어 있는 기본 키를 써요') + '" value="' + escapeHtml(f.key) + '"></div>' +
+      '<p class="sm-hint">이 키는 사용자 브라우저에서 직접 쓰이는 키라, 접속한 사람이 개발자 도구로 볼 수 있어요. 지금도 코드에 들어 있는 것과 같은 수준이에요. Google Cloud에서 <b>이 사이트 주소(HTTP 리퍼러)로만 쓰도록 제한</b>하고 예산 알림을 걸어 두세요.</p>' +
+      '<div class="field-row"><div class="field" style="max-width:240px;"><label>프로젝트 하루 호출 한도</label><input type="number" min="0" id="ad-ai-gdaily" placeholder="AI Studio에서 확인한 값" value="' + escapeHtml(String(f.geminiDaily)) + '"></div>' +
+      '<div class="field" style="max-width:240px;"><label>Tavily 월 크레딧</label><input type="number" min="0" id="ad-ai-tmonth" placeholder="무료는 1000" value="' + escapeHtml(String(f.tavilyMonthly)) + '"></div></div>' +
+      '<p class="sm-hint">두 숫자는 "현황" 화면에서 남은 횟수를 계산하는 데만 쓰여요 (Google·Tavily는 남은 양을 직접 알려주지 않아서 직접 입력해요).</p>' +
+      '<button class="btn small" id="ad-ai-save" ' + (ad.aiTestBusy ? 'disabled' : '') + '>' + (ad.aiTestBusy ? '확인하는 중...' : '연결 확인 후 저장') + '</button></div>' +
+      '<div class="acct-block"><div class="acct-label">Tavily (웹 검색)</div>' +
+      '<p style="font-size:14.5px;line-height:1.7;color:var(--cream-soft);margin:0;">검색 키는 Cloudflare Worker 안에 보관돼 있어서 여기서 바꿀 수 없어요. 바꾸려면 Cloudflare 대시보드에서 Worker의 <b>TAVILY_API_KEY</b>를 수정하세요. 사용량은 위 현황에서 볼 수 있어요.</p></div>';
+    return html;
+  }
+  function readAiForm(){
+    var f = state.admin.aiForm || (state.admin.aiForm = {});
+    var g = function(id){ var el = document.getElementById(id); return el ? el.value : null; };
+    var m = g('ad-ai-model'); if (m !== null) f.model = m.trim();
+    var k = g('ad-ai-key'); if (k !== null) f.key = k.trim();
+    var d = g('ad-ai-gdaily'); if (d !== null) f.geminiDaily = d.trim();
+    var t = g('ad-ai-tmonth'); if (t !== null) f.tavilyMonthly = t.trim();
+    return f;
+  }
+  // direct ping with a candidate model/key (not counted in usage)
+  function geminiPing(model, key){
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(key);
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: 'ping' }] }], generationConfig: { maxOutputTokens: 8 } }) })
+      .then(function(res){ return res.json().then(function(d){ if (d.error){ var e = new Error(d.error.message || 'Gemini API 오류'); e.status = d.error.code || res.status; throw e; } return true; }); });
+  }
+  function adminSaveAi(){
+    var ad = state.admin, f = readAiForm(), cfg = state.aiConfig || {};
+    var model = f.model || cfg.model || '';
+    var key = f.key || cfg.apiKey || GEMINI_API_KEY;
+    var gd = f.geminiDaily === '' ? null : parseInt(f.geminiDaily, 10);
+    var tm = f.tavilyMonthly === '' ? null : parseInt(f.tavilyMonthly, 10);
+    if ((gd !== null && (isNaN(gd) || gd < 0)) || (tm !== null && (isNaN(tm) || tm < 0))){ ad.msg = { type: 'err', text: '한도는 0 이상의 숫자로 적어주세요.' }; render(); return; }
+    if (!model){ ad.msg = { type: 'err', text: '모델명을 입력해주세요. "사용 가능한 모델 확인"으로 골라도 돼요.' }; render(); return; }
+    ad.aiTestBusy = true; ad.msg = null; render();
+    geminiPing(model, key).then(function(){ return null; }, function(err){
+      if (err && err.status === 429) return '연결은 되지만 지금 한도 오류(429)가 나고 있어요. 그래도 저장했어요.';
+      throw err;
+    }).then(function(warn){
+      var data = { model: model, apiKey: f.key || cfg.apiKey || null, geminiDaily: gd, tavilyMonthly: tm, updatedAt: Date.now() };
+      return fbDb.collection('config').doc('ai').set(data).then(function(){
+        state.aiConfig = data; ad.aiForm = null; ad.aiTestBusy = false;
+        ad.msg = { type: warn ? 'err' : 'ok', text: warn || ('저장했어요. "' + model + '" 모델이 정상 동작해요. 사용자는 새로고침 없이 다음 요청부터 이 설정을 써요.') }; render();
+      });
+    }).catch(function(err){
+      ad.aiTestBusy = false;
+      var hint = err && err.status === 404 ? ' 아래 목록에서 실제 사용 가능한 모델을 골라주세요.' : '';
+      ad.msg = { type: 'err', text: '저장하지 않았어요. 연결 확인에 실패했어요 (' + ((err && err.message) || adminErrMsg(err)) + ').' + hint }; render();
+    });
+  }
+  function adminListModels(){
+    var ad = state.admin, f = readAiForm();
+    ad.aiTestBusy = true; ad.msg = null; render();
+    listGeminiModels(f.key || ((state.aiConfig && state.aiConfig.apiKey) || '')).then(function(models){
+      ad.aiModels = models; ad.aiTestBusy = false; ad.msg = { type: 'ok', text: models.length + '개 모델을 찾았어요. 눌러서 고르세요.' }; render();
+    }).catch(function(err){
+      ad.aiTestBusy = false; ad.msg = { type: 'err', text: '모델 목록을 불러오지 못했어요: ' + ((err && err.message) || '오류') }; render();
+    });
   }
   function adminAnnHtml(){
     var ad = state.admin, a = state.announcement;
@@ -4923,6 +5046,11 @@
     var ref = $('ad-refresh'); if (ref) ref.addEventListener('click', adminLoadUsers);
     var glr = $('ad-gl-refresh'); if (glr) glr.addEventListener('click', adminLoadGl);
     var defSave = $('ad-def-save'); if (defSave) defSave.addEventListener('click', adminSaveDefault);
+    document.querySelectorAll('[data-adperiod]').forEach(function(b){ b.addEventListener('click', function(){ ad.period = b.getAttribute('data-adperiod'); render(); }); });
+    var aiSave = $('ad-ai-save'); if (aiSave) aiSave.addEventListener('click', adminSaveAi);
+    var aiList = $('ad-ai-list'); if (aiList) aiList.addEventListener('click', adminListModels);
+    document.querySelectorAll('[data-ad-model]').forEach(function(b){ b.addEventListener('click', function(){ readAiForm(); ad.aiForm.model = b.getAttribute('data-ad-model'); render(); }); });
+    ['ad-ai-model', 'ad-ai-key', 'ad-ai-gdaily', 'ad-ai-tmonth'].forEach(function(id){ var el = $(id); if (el) el.addEventListener('input', readAiForm); });
     var limSave = $('ad-lim-save'); if (limSave) limSave.addEventListener('click', function(){ adminSaveLimit(limSave.getAttribute('data-uid')); });
     var lm = $('ad-load-mats'); if (lm) lm.addEventListener('click', function(){ adminLoadUserData(lm.getAttribute('data-uid')); });
     var mf = $('ad-mat-filter'); if (mf) mf.addEventListener('change', function(){ ad.detail.filter = mf.value; render(); });
