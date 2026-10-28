@@ -390,6 +390,8 @@
     tutorialOpen: false, tutorialStep: 0, tutorialDone: false,
     apv: { q: '', field: 'all', sort: 'recent' },
     fieldModel: {}, profileField: 'all',
+    retrainMsg: null,
+    rescore: { scope: 'old', retrain: true, busy: false, done: 0, total: 0, msg: null },
     sel: {}, selVisible: [], shareModal: null,
     sharedLinks: [], displayName: '', viewer: null, aiUsage: null,
     groups: { list: null, loading: false, busy: false, err: null, msg: null, active: null, items: null, itemsLoading: false, itemsErr: null, filter: 'all', newName: '', joinCode: '' },
@@ -1360,7 +1362,7 @@
         kept.push({
           id: uid(), title: it.title || baseQuery, field: fallbackField, subfield: null,
           source: host || '미상', url: it.url || null, matchReason: v.reason || null,
-          scores: v.scores, status: 'pending', rejectReason: null, createdAt: Date.now()
+          scores: v.scores, sv: SCORE_VER, status: 'pending', rejectReason: null, createdAt: Date.now()
         });
       });
     }
@@ -1864,6 +1866,10 @@
   // Shared scoring rubric. Without anchors the model drifts to a "safe" 60-80
   // for everything, which makes the 8 scores (and the learned weights built on
   // them) nearly indistinguishable between materials.
+  // Materials scored under the current rubric carry sv === SCORE_VER; anything
+  // without it was scored under an older (more generous) rubric.
+  var SCORE_VER = 2;
+
   var SCORE_RUBRIC =
     '[채점] 0~100점. 50=검색하면 흔히 나오는 평범한 웹 자료. 후하게 주지 말고 전체 범위를 써.\n' +
     '신뢰성: 90+=정부·학술지·공신력 기관 원문, 70=주요 언론, 50=출처 불분명·개인 블로그, 20-=광고·루머\n' +
@@ -1997,7 +2003,7 @@
   // suffix so the success toast can honestly say whether scoring actually happened.
   function applyAiScores(created, scoresList){
     var applied = 0;
-    created.forEach(function(m, i){ if (scoresList[i]){ m.scores = scoresList[i]; applied++; } });
+    created.forEach(function(m, i){ if (scoresList[i]){ m.scores = scoresList[i]; m.sv = SCORE_VER; applied++; } });
     if (applied === created.length) return ' (AI 채점 완료)';
     if (applied > 0) return ' (' + applied + '/' + created.length + '개만 AI 채점됨, 나머지는 기본 점수)';
     return ' (AI 응답을 적용하지 못해 기본 점수로 등록됨)';
@@ -3161,6 +3167,113 @@
     return html;
   }
 
+  // ---- 점수 다시 매기기 + 기준 다시 학습 ----
+  var MAX_RESCORE = 200;   // per run (10 AI calls): keeps token use and daily quota predictable
+  function rescoreTargets(scope){
+    var list = state.materials.filter(function(m){
+      if (scope === 'old') return m.sv !== SCORE_VER;
+      if (scope === 'all') return true;
+      return m.status === scope;
+    });
+    var rank = function(m){ return m.status === 'pending' ? 1 : 0; };   // decided cards first: they feed the learning
+    return list.sort(function(a, b){ return rank(a) - rank(b) || (a.createdAt || 0) - (b.createdAt || 0); });
+  }
+  function rescoreEstimate(n){
+    var calls = Math.ceil(n / 20);
+    return { calls: calls, tokens: calls * 600 + n * 180 };
+  }
+
+  // Replays every decision (oldest first) on a fresh model using the CURRENT scores.
+  function retrainFromHistory(){
+    var rows = state.materials.filter(function(m){ return m.status === 'approved' || m.status === 'rejected'; })
+      .sort(function(a, b){ return (a.decidedAt || a.createdAt || 0) - (b.decidedAt || b.createdAt || 0); });
+    state.weights = zeroWeights(); state.bias = 0; state.trained = 0; state.fieldModel = {};
+    for (var ep = 0; ep < 2; ep++){
+      rows.forEach(function(m){ trainStep(scoreVec(m), m.status === 'approved' ? 1 : 0, m.field); });
+    }
+    // report real decision counts (not passes)
+    state.trained = rows.length;
+    var perField = {};
+    rows.forEach(function(m){ if (m.field) perField[m.field] = (perField[m.field] || 0) + 1; });
+    Object.keys(state.fieldModel).forEach(function(f){ state.fieldModel[f].n = perField[f] || 0; });
+    state.profileField = 'all';
+    return rows.length;
+  }
+
+  async function runRescore(){
+    var rs = state.rescore;
+    if (rs.busy) return;
+    var list = rescoreTargets(rs.scope).slice(0, MAX_RESCORE);
+    if (!list.length) return;
+    rs.busy = true; rs.done = 0; rs.total = list.length; rs.msg = null; render();
+    // chunks of 20; a tiny remainder (<4) joins the previous chunk so the spread check still has enough items
+    var chunks = [];
+    for (var i = 0; i < list.length; i += 20) chunks.push(list.slice(i, i + 20));
+    if (chunks.length > 1 && chunks[chunks.length - 1].length < 4){
+      var tail = chunks.pop(); chunks[chunks.length - 1] = chunks[chunks.length - 1].concat(tail);
+    }
+    var applied = 0, failed = 0, stopErr = null, processed = 0;
+    for (var c = 0; c < chunks.length; c++){
+      var chunk = chunks[c];
+      try {
+        var res = await estimateScoresChunkGemini(chunk.map(function(m){ return { title: m.title, source: m.source, url: m.url, content: m.summary || null }; }));
+        spreadScores(res);
+        res.forEach(function(sc, j){
+          if (sc){ chunk[j].scores = sc; chunk[j].sv = SCORE_VER; applied++; } else failed++;
+        });
+        saveMaterials();
+        processed += chunk.length;
+        rs.done = processed; render();
+      } catch(e){
+        stopErr = e; failed += chunk.length;
+        for (var k = c + 1; k < chunks.length; k++) failed += chunks[k].length;
+        break;
+      }
+    }
+    var msg = applied + '개의 점수를 새로 매겼어요.';
+    if (!stopErr && failed === 0 && rs.retrain){
+      var n = retrainFromHistory();
+      saveMaterials(); saveModel();
+      msg += ' 새 점수로 내 기준을 다시 학습했어요 (평가한 ' + n + '장).';
+    } else if (rs.retrain && (stopErr || failed)){
+      msg += ' 일부만 끝나서 기준 다시 학습은 하지 않았어요. 나머지를 마친 뒤 아래 "내 기준 다시 학습"을 눌러주세요.';
+    }
+    if (stopErr) msg += ' 중간에 멈췄어요: ' + ((stopErr && stopErr.message) ? stopErr.message : '오류') + ' (한도 오류라면 시간이 지난 뒤 이어서 하면 돼요. 이미 끝난 자료는 다시 하지 않아요.)';
+    else if (failed) msg += ' ' + failed + '개는 AI 응답을 받지 못했어요. 다시 실행하면 그 자료만 이어서 해요.';
+    var left = rescoreTargets(rs.scope).length;
+    if (rs.scope === 'old' && left > 0 && !stopErr && !failed) msg += ' 아직 ' + left + '개가 남았어요. 한 번에 최대 ' + MAX_RESCORE + '개씩 해요.';
+    rs.busy = false; rs.msg = { type: (stopErr || failed) ? 'err' : 'ok', text: msg };
+    render();
+  }
+
+  function rescoreBlockHtml(){
+    var rs = state.rescore;
+    var counts = {
+      old: rescoreTargets('old').length, approved: rescoreTargets('approved').length,
+      rejected: rescoreTargets('rejected').length, pending: rescoreTargets('pending').length, all: state.materials.length
+    };
+    var labels = { old: '예전 기준으로 매긴 자료', approved: '승인 자료 전부', rejected: '반려 자료 전부', pending: '대기 자료 전부', all: '모든 자료' };
+    var opts = ['old', 'approved', 'rejected', 'pending', 'all'].map(function(k){
+      return '<option value="' + k + '"' + (rs.scope === k ? ' selected' : '') + '>' + labels[k] + ' (' + counts[k] + '개)</option>';
+    }).join('');
+    var n = Math.min(MAX_RESCORE, counts[rs.scope]);
+    var est = rescoreEstimate(n);
+    var html = '<div class="acct-block"><div class="acct-label">점수 다시 매기기 (AI 사용)</div>' +
+      '<p style="font-size:14.5px;line-height:1.7;color:var(--cream-soft);margin:0 0 12px;">예전에 높게 매겨졌던 점수를 지금의 채점 기준으로 다시 매겨요. <b style="color:var(--cream);">상대 비교로 조정했던 점수도 새 값으로 바뀌어요.</b></p>' +
+      '<div class="field" style="max-width:340px;"><label>대상</label><select id="rs-scope"' + (rs.busy ? ' disabled' : '') + '>' + opts + '</select></div>' +
+      '<div class="toggle-row"><input type="checkbox" id="rs-retrain" ' + (rs.retrain ? 'checked' : '') + (rs.busy ? ' disabled' : '') + '><label for="rs-retrain" style="margin:0;">끝나면 내 기준도 새 점수로 다시 학습하기</label></div>' +
+      '<p class="sm-hint">' + (n ? n + '개 · AI 호출 약 ' + est.calls + '회 · 약 ' + Math.round(est.tokens / 1000) + '천 토큰' + (counts[rs.scope] > MAX_RESCORE ? ' (한 번에 최대 ' + MAX_RESCORE + '개, 남은 건 다시 실행)' : '') : '다시 매길 자료가 없어요.') + '</p>' +
+      '<button class="btn small" id="rs-run" ' + ((rs.busy || !n) ? 'disabled' : '') + '>' + (rs.busy ? '다시 매기는 중... ' + rs.done + ' / ' + rs.total : '점수 다시 매기기') + '</button>' +
+      (rs.msg ? '<p class="acct-msg ' + rs.msg.type + '" style="margin:12px 0 0;">' + escapeHtml(rs.msg.text) + '</p>' : '') +
+      '</div>';
+    html += '<div class="acct-block"><div class="acct-label">내 기준 다시 학습 (AI 사용 안 함)</div>' +
+      '<p style="font-size:14.5px;line-height:1.7;color:var(--cream-soft);margin:0 0 12px;">지금까지 승인·반려한 기록을 처음부터 다시 배워서 내 기준(분야별 기준 포함)을 새로 계산해요. 점수를 직접 고치거나 다시 매긴 뒤에 쓰면 좋아요. 토큰이 들지 않아요. 상대 비교로 배운 부분은 다시 계산되지 않아요.</p>' +
+      '<button class="btn ghost small" id="retrain-run">지금 점수로 다시 학습하기</button>' +
+      (state.retrainMsg ? '<p class="acct-msg ok" style="margin:12px 0 0;">' + escapeHtml(state.retrainMsg) + '</p>' : '') +
+      '</div>';
+    return html;
+  }
+
   function settingsTabHtml(){
     var html = '<p class="section-title">AI 연동</p>';
     html += '<div class="acct-block"><div class="acct-label">검색·채점 엔진</div>' +
@@ -3206,6 +3319,7 @@
       '<div class="acct-block"><div class="acct-label">저장 용량</div>' +
       '<p style="font-size:14.5px;line-height:1.7;color:var(--cream-soft);margin:0;">자료 <b style="color:var(--cream);">' + st.materials + '개</b> (약 ' + kb(st.matBytes) + ') · 의견 이슈 <b style="color:var(--cream);">' + st.issues + '개</b> (약 ' + kb(st.issueBytes) + ')<br>' +
       '데이터는 약 300KB씩 나눠(' + st.pages + '개 묶음) 저장해서, 예전의 "계정당 1MB" 한계 없이 수천 개의 자료를 담을 수 있어요.</p></div>' +
+      rescoreBlockHtml() +
       '<button class="btn ghost small" id="reset-all">모든 데이터 초기화</button>';
 
     html += '<p class="section-title">계정 관리</p>';
@@ -3378,6 +3492,7 @@
 
       function finalizeAdd(scores, suffix){
         var newMat = { id: uid(), title:title, field:field, subfield:subfield, source: source || '미상', url: urlVal || null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
+        if (suffix && suffix.indexOf('AI 채점 완료') !== -1) newMat.sv = SCORE_VER;
         state.materials.push(newMat);
         saveMaterials();
         showToast('자료가 추가되었어요.' + (suffix || '') + ' 카드 평가에서 만나보세요.');
@@ -4020,6 +4135,26 @@
       saveMaterials(); saveModel();
       showToast('비교 결과가 반영되었어요');
       c.a = null; c.b = null; c.critAnswers = {}; c.overall = null;
+      render();
+    });
+
+    var rsScope = document.getElementById('rs-scope');
+    if (rsScope) rsScope.addEventListener('change', function(){ state.rescore.scope = rsScope.value; state.rescore.msg = null; render(); });
+    var rsRetrain = document.getElementById('rs-retrain');
+    if (rsRetrain) rsRetrain.addEventListener('change', function(){ state.rescore.retrain = rsRetrain.checked; });
+    var rsRun = document.getElementById('rs-run');
+    if (rsRun) rsRun.addEventListener('click', function(){
+      var n = Math.min(MAX_RESCORE, rescoreTargets(state.rescore.scope).length);
+      var est = rescoreEstimate(n);
+      if (!confirm(n + '개 자료의 점수를 AI가 다시 매겨요 (AI 호출 약 ' + est.calls + '회).\n이전 점수(상대 비교로 조정한 값 포함)는 새 값으로 바뀌어요. 계속할까요?')) return;
+      runRescore();
+    });
+    var retrainRun = document.getElementById('retrain-run');
+    if (retrainRun) retrainRun.addEventListener('click', function(){
+      if (!confirm('내 기준을 지금까지의 승인·반려 기록으로 처음부터 다시 계산할까요? 상대 비교로 배운 부분은 다시 계산되지 않아요.')) return;
+      var n = retrainFromHistory();
+      saveMaterials(); saveModel();
+      state.retrainMsg = '평가한 ' + n + '장으로 내 기준을 다시 학습했어요.';
       render();
     });
 
