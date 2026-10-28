@@ -37,6 +37,7 @@
     menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>',
     chevDown: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     opinions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5h16v10H9l-5 4V5z"/><path d="M8 9h8M8 12h5"/></svg>',
+    chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 6h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-7l-4 3v-3H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z" stroke-linejoin="round"/></svg>',
     bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16z" stroke-linejoin="round"/><path d="M10 20a2 2 0 0 0 4 0" stroke-linecap="round"/></svg>',
     help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M9.4 9.3a2.7 2.7 0 1 1 3.9 2.4c-.9.5-1.3 1-1.3 2" stroke-linecap="round"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/></svg>'
   };
@@ -62,15 +63,22 @@
     ]},
     { id:'settings', label:'설정', icon: ICONS.settings },
     { id:'updates', label:'업데이트 기록', icon: ICONS.bell },
+    { id:'feedback', label:'의견 보내기', icon: ICONS.chat },
     { id:'help', label:'도움말', icon: ICONS.help }
   ];
 
   // ---- 업데이트 기록 ----
   // Newest first. When shipping a change: add an entry at the TOP and bump
   // APP_VERSION to its v. Users who have not seen it get a popup on next load.
-  var APP_VERSION = '1.13';
+  var APP_VERSION = '1.14';
   var CHANGELOG = [
-    { v: '1.13', date: '2026-10-28', title: 'AI 설정은 관리자가 · 사용량 그래프',
+    { v: '1.14', date: '2026-10-28', title: '점수 정정 · 의견 보내기',
+      items: [
+        '<b>점수 정정</b>: 카드와 자료함의 "점수 정정"으로 AI가 매긴 점수가 이상할 때 직접 고칠 수 있어요. 고친 점수는 내 기준 학습에 쓰여요.',
+        '<b>정정이 쌓이면 AI 점수가 보정돼요.</b> 한 번 고친 건 영향이 아주 작고, 내가 여러 번 고치거나 여러 사람이 같은 출처를 비슷하게 고치면 영향이 점점 커져요. 성향 분석에서 AI가 얼마나 틀렸는지도 볼 수 있어요.',
+        '<b>의견 보내기</b>: 메뉴에서 언제든 보낼 수 있고, 카드 평가·자료 수집을 50번쯤 하면 한 번 물어봐요. 좋았던 점·불편한 점·오류·아이디어를 알려주세요. 이메일은 보내지지 않아요.'
+      ] },
+    { v: '1.13', title: 'AI 설정은 관리자가 · 사용량 그래프',
       items: [
         '<b>AI 모델·키 설정이 관리자에게로</b> 옮겨갔어요. 이제 사용자는 모델을 고르거나 설정할 필요가 없어요. 설정 → AI 사용량에서 남은 횟수만 보면 돼요.',
         '관리자 화면에 <b>AI·검색(Tavily) 사용량과 남은 한도</b>, <b>사용자별 사용량 그래프</b>, 최근 7일 추이가 생겼어요.',
@@ -455,6 +463,9 @@
       tutorialDone: state.tutorialDone,
       seenVersion: state.seenVersion,
       seenAnnouncement: state.seenAnnouncement,
+      fixStats: state.fixStats,
+      activity: state.activity,
+      fbNext: state.fbNext,
       sharedLinks: state.sharedLinks,
       displayName: state.displayName,
       aiUsage: state.aiUsage,
@@ -532,8 +543,9 @@
     apv: { q: '', field: 'all', sort: 'recent' },
     fieldModel: {}, profileField: 'all',
     seenVersion: null, updatePopup: null, updateNew: null,
+    fixStats: { all: {}, dom: {} }, fixModal: null, fbModal: null, activity: 0, fbNext: 50,
     aiConfig: null, isAdmin: false, announcement: null, annPopup: null, seenAnnouncement: null, limits: { def: null, mine: null },
-    admin: { sub: 'stats', users: null, userLimits: {}, loadingUsers: false, userErr: null, detail: null, groups: null, links: null, loadingGl: false, glErr: null, msg: null, annTitle: '', annBody: '', annUrgent: false, busy: false, period: 'today', aiForm: null, aiTestBusy: false, aiModels: null },
+    admin: { sub: 'stats', users: null, userLimits: {}, loadingUsers: false, userErr: null, detail: null, groups: null, links: null, loadingGl: false, glErr: null, msg: null, annTitle: '', annBody: '', annUrgent: false, busy: false, fb: { list: null, loading: false, err: null, filter: 'new' }, period: 'today', aiForm: null, aiTestBusy: false, aiModels: null },
     retrainMsg: null,
     rescore: { scope: 'old', retrain: true, busy: false, done: 0, total: 0, msg: null },
     sel: {}, selVisible: [], shareModal: null,
@@ -640,6 +652,10 @@
       state.tutorialDone = data.tutorialDone === true;
       state.seenVersion = typeof data.seenVersion === 'string' ? data.seenVersion : null;
       state.seenAnnouncement = typeof data.seenAnnouncement === 'string' ? data.seenAnnouncement : null;
+      state.fixStats = (data.fixStats && typeof data.fixStats === 'object' && data.fixStats.all) ? data.fixStats : { all: {}, dom: {} };
+      if (!state.fixStats.dom) state.fixStats.dom = {};
+      state.activity = typeof data.activity === 'number' ? data.activity : 0;
+      state.fbNext = typeof data.fbNext === 'number' ? data.fbNext : 50;
       state.sharedLinks = Array.isArray(data.sharedLinks) ? data.sharedLinks : [];
       state.displayName = typeof data.displayName === 'string' ? data.displayName : '';
       state.aiUsage = (data.aiUsage && typeof data.aiUsage === 'object') ? data.aiUsage : null;
@@ -800,6 +816,7 @@
     material.status = approve ? 'approved' : 'rejected';
     material.rejectReason = approve ? null : (reason || '기타');
     material.decidedAt = Date.now();
+    state.activity++;
     // remember what the learned model predicted BEFORE it learns from this decision
     material.predFit = Math.round(predictFit(material) * 100) / 100;
     material.predN = state.trained;
@@ -937,6 +954,8 @@
     else if (state.tutorialOpen) html += tutorialHtml();
     else if (state.updatePopup) html += updatePopupHtml();
     else if (state.annPopup) html += annPopupHtml();
+    else if (state.fbModal) html += fbModalHtml();
+    if (state.fixModal) html += fixModalHtml();
     if (state.toast) html += '<div class="toast" id="toast-el">' + escapeHtml(state.toast) + '</div>';
 
     app.innerHTML = html;
@@ -1030,10 +1049,11 @@
   }
 
   function moreLinkHtml(material, extraClass){
+    var fixBtn = '<button type="button" class="more-link" data-fix="' + material.id + '" data-nodrag="1" style="background:none;border:0;border-bottom:1px solid var(--gold-soft);cursor:pointer;margin-left:14px;">점수 정정' + (material.fixCount ? ' ✓' : '') + '</button>';
     if (material.url){
-      return '<div class="card-more ' + (extraClass||'') + '"><a class="more-link" href="' + escapeHtml(material.url) + '" target="_blank" rel="noopener noreferrer" data-nodrag="1">원문 보기 →</a></div>';
+      return '<div class="card-more ' + (extraClass||'') + '"><a class="more-link" href="' + escapeHtml(material.url) + '" target="_blank" rel="noopener noreferrer" data-nodrag="1">원문 보기 →</a>' + fixBtn + '</div>';
     }
-    return '<div class="card-more ' + (extraClass||'') + '"><span class="no-link">원문 URL 없음</span></div>';
+    return '<div class="card-more ' + (extraClass||'') + '"><span class="no-link">원문 URL 없음</span>' + fixBtn + '</div>';
   }
 
   function summaryBlockHtml(material){
@@ -1446,6 +1466,7 @@
       return { keep: r.keep, reason: r.reason.slice(0, 80), scores: r.scores };
     });
     spreadScores(judged.map(function(j){ return j && j.scores; }));
+    await calibrateScores(items, judged.map(function(j){ return j && j.scores; }));
     return judged;
   }
 
@@ -2111,7 +2132,9 @@
         out = out.concat(items.slice(i, i + CHUNK).map(function(){ return null; }));
       }
     }
-    return spreadScores(out);
+    spreadScores(out);
+    await calibrateScores(items, out);   // after the spread, so a small nudge stays small
+    return out;
   }
 
   async function estimateScoresChunkGemini(items){
@@ -3279,6 +3302,7 @@
     '</div>';
 
     html += accuracyBlockHtml();
+    html += fixBlockHtml();
 
     html += '<p class="section-title">당신이 중요하게 여기는 기준</p>';
     var decidedByField = {};
@@ -3380,6 +3404,7 @@
       try {
         var res = await estimateScoresChunkGemini(chunk.map(function(m){ return { title: m.title, source: m.source, url: m.url, content: m.summary || null }; }));
         spreadScores(res);
+        await calibrateScores(chunk, res);
         res.forEach(function(sc, j){
           if (sc){ chunk[j].scores = sc; chunk[j].sv = SCORE_VER; applied++; } else failed++;
         });
@@ -3485,12 +3510,14 @@
 
   // ---------- event wiring ----------
   function goTab(t){
+    if (t === 'feedback'){ state.menuOpen = false; openFeedback('menu'); return; }
     if (state.tab !== t){ state.sel = {}; state.shareModal = null; }
     if (t === 'share'){ state.groups.active = null; state.groups.msg = null; }
     state.tab = t; state.menuOpen = false;
     render();
     if (t === 'share') loadGroups(false);
     if (t === 'admin' && state.isAdmin) adminEnter();
+    maybeAskFeedback();
   }
   function attachHandlers(pending, approved, rejected){
     document.querySelectorAll('[data-goto]').forEach(function(btn){
@@ -3631,6 +3658,7 @@
       function finalizeAdd(scores, suffix){
         var newMat = { id: uid(), title:title, field:field, subfield:subfield, source: source || '미상', url: urlVal || null, scores: scores, status:'pending', rejectReason:null, createdAt: Date.now() };
         if (suffix && suffix.indexOf('AI 채점 완료') !== -1) newMat.sv = SCORE_VER;
+        state.activity++;
         state.materials.push(newMat);
         saveMaterials();
         showToast('자료가 추가되었어요.' + (suffix || '') + ' 카드 평가에서 만나보세요.');
@@ -3687,6 +3715,7 @@
       render();
 
       function finishSuccess(created, suffix){
+        state.activity++;
         state.materials = state.materials.concat(created);
         saveMaterials();
         state.home.loading = false;
@@ -3756,6 +3785,7 @@
       var statusEl = document.getElementById('bulk-urls-status');
 
       function finalize(list, suffix){
+        state.activity++;
         state.materials = state.materials.concat(list);
         saveMaterials();
         showToast(list.length + '개 자료가 추가되었어요' + (suffix || ''));
@@ -3817,6 +3847,7 @@
         var dedupSuffix = dedup.skipped > 0 ? (' (중복 ' + dedup.skipped + '개 제외' + (dedup.shortBy > 0 ? ', 더 찾지 못해 ' + dedup.shortBy + '개 부족' : '') + ')') : '';
 
         function finalize(list, suffix){
+          state.activity++;
           list.forEach(function(m){ delete m.content; });
           state.materials = state.materials.concat(list);
           saveMaterials();
@@ -4318,6 +4349,7 @@
       if (!confirm('모든 자료와 학습 데이터를 초기화할까요? 이 작업은 되돌릴 수 없습니다.')) return;
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0; state.fieldModel = {};
+      state.fixStats = { all: {}, dom: {} };
       state.issues = [];
       state.opinionsView.mode = 'list'; state.opinionsView.activeIssueId = null;
       saveMaterials(); saveModel(); saveIssues();
@@ -4455,6 +4487,263 @@
         render();
       }
     });
+  }
+
+  // ---- 점수 정정 · 단계적 보정 ----
+  // A correction is a small vote, not a rule: the more corrections exist (from me, and from
+  // other people for the same site), the more the AI's future scores are nudged.
+  //   personal : mean(my deltas) * n / (n + 8)                 (8 fixes -> half effect)
+  //   per site : weighted mean * effN / (effN + 10)             (each person counts at most 5 fixes)
+  var FIX_CAP = 25;
+  function fixDomain(url){
+    try {
+      var h = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+      return /^[a-z0-9][a-z0-9.-]{1,80}$/.test(h) ? h : '';
+    } catch(e){ return ''; }
+  }
+  var domainCache = {};
+  function loadDomainStats(domains){
+    var now = Date.now();
+    var need = domains.filter(function(d){ return d && (!domainCache[d] || now - domainCache[d].t > 1800000); }).slice(0, 25);
+    if (!need.length || !fbDb) return Promise.resolve();
+    return Promise.all(need.map(function(d){
+      return fbDb.collection('domain_fixes').doc(d).get().then(function(sn){
+        domainCache[d] = { t: Date.now(), data: sn.exists ? sn.data() : null };
+      }).catch(function(){ domainCache[d] = { t: Date.now(), data: null }; });
+    }));
+  }
+  function personalAdj(key){
+    var e = state.fixStats && state.fixStats.all && state.fixStats.all[key];
+    if (!e || !e[0]) return 0;
+    var mean = e[1] / e[0];
+    return mean * e[0] / (e[0] + 8);
+  }
+  function domainAdj(dom, key){
+    var c = domainCache[dom];
+    if (!c || !c.data || !c.data.u) return 0;
+    var effN = 0, acc = 0;
+    Object.keys(c.data.u).forEach(function(uid0){
+      var e = c.data.u[uid0] && c.data.u[uid0][key];
+      if (!e || !e[0]) return;
+      var w = Math.min(e[0], 5);
+      effN += w; acc += w * e[1];
+    });
+    if (!effN) return 0;
+    return (acc / effN) * (effN / (effN + 10));
+  }
+  async function calibrateScores(items, scoresList){
+    try {
+      var doms = items.map(function(it){ return it && it.url ? fixDomain(it.url) : ''; });
+      await loadDomainStats(doms);
+      scoresList.forEach(function(sc, i){
+        if (!sc) return;
+        CRITERIA.forEach(function(c){
+          var adj = personalAdj(c.key) + (doms[i] ? domainAdj(doms[i], c.key) : 0);
+          adj = Math.max(-FIX_CAP, Math.min(FIX_CAP, adj));
+          if (Math.abs(adj) >= 1) sc[c.key] = Math.max(3, Math.min(97, Math.round(sc[c.key] + adj)));
+        });
+      });
+    } catch(e){}
+  }
+  function recordFix(key, delta, dom){
+    var st = state.fixStats;
+    var bump = function(box){ var e = box[key] || (box[key] = [0, 0]); e[0]++; e[1] += delta; };
+    bump(st.all);
+    if (dom){
+      if (!st.dom[dom]){
+        if (Object.keys(st.dom).length >= 200) return;   // keep the saved record small
+        st.dom[dom] = {};
+      }
+      bump(st.dom[dom]);
+    }
+  }
+  function pushDomainFix(dom){
+    var st = state.fixStats.dom[dom];
+    if (!dom || !st || !state.user || !fbDb) return;
+    var mine = {};
+    Object.keys(st).forEach(function(k){ mine[k] = [st[k][0], Math.round(st[k][1] / st[k][0] * 10) / 10]; });
+    var u = {}; u[state.user.uid] = mine;
+    try {
+      fbDb.collection('domain_fixes').doc(dom).set({ u: u }, { merge: true }).then(function(){ delete domainCache[dom]; }).catch(function(){});
+    } catch(e){}
+  }
+  function openFix(id){
+    var m = findMaterial(id);
+    if (!m) return;
+    var vals = {};
+    CRITERIA.forEach(function(c){ vals[c.key] = m.scores[c.key] != null ? m.scores[c.key] : 50; });
+    state.fixModal = { id: id, vals: vals, reason: '' };
+    render();
+  }
+  function fixModalHtml(){
+    var fm = state.fixModal, m = findMaterial(fm.id);
+    if (!m) return '';
+    var base = m.aiScores || m.scores;
+    var rows = CRITERIA.map(function(c){
+      var v = fm.vals[c.key], o = m.scores[c.key];
+      return '<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;font-size:14.5px;"><span>' + c.label + '</span>' +
+        '<span><b id="fix-val-' + c.key + '">' + v + '</b> <span style="color:var(--ink-soft);font-size:12.5px;">(현재 ' + o + (m.aiScores ? ' · AI 원래 ' + base[c.key] : '') + ')</span></span></div>' +
+        '<input type="range" min="0" max="100" step="1" value="' + v + '" data-fixkey="' + c.key + '" style="width:100%;"></div>';
+    }).join('');
+    var reasons = ['', '출처를 다르게 봐요', '내용을 잘못 짐작했어요', 'AI가 너무 후해요', 'AI가 너무 박해요', '기타'];
+    return '<div class="modal-overlay" id="fix-overlay" style="z-index:70;"><div class="modal tut-modal" role="dialog" aria-modal="true" style="max-height:92vh;overflow-y:auto;">' +
+      '<button type="button" class="tut-close" id="fix-close-x" aria-label="닫기">' + ICONS.x + '</button>' +
+      '<div class="tut-count">점수 정정</div><h3 style="margin-top:10px;font-size:20px;">' + escapeHtml(m.title) + '</h3>' +
+      '<p class="tut-hint" style="margin:0 0 14px;font-size:14px;line-height:1.6;">AI가 추정한 점수가 이상하면 슬라이더로 고치세요. 바꾼 항목만 기록돼요. 한 번 고친 건 영향이 아주 작고, 비슷한 정정이 여러 번 쌓이면 이후 AI 점수에 조금씩 반영돼요.</p>' +
+      rows +
+      '<div class="field" style="margin:14px 0;"><label style="color:var(--ink-soft);">왜 고쳤나요? (선택)</label><select id="fix-reason">' + reasons.map(function(r){ return '<option value="' + r + '"' + (fm.reason === r ? ' selected' : '') + '>' + (r || '선택 안 함') + '</option>'; }).join('') + '</select></div>' +
+      '<div class="tut-actions"><button type="button" class="tut-skip" id="fix-cancel">취소</button><div class="right"><button type="button" class="btn small" id="fix-save">정정 저장</button></div></div>' +
+      '</div></div>';
+  }
+  function saveFix(){
+    var fm = state.fixModal, m = fm && findMaterial(fm.id);
+    if (!m){ state.fixModal = null; render(); return; }
+    var dom = m.url ? fixDomain(m.url) : '';
+    var changed = 0;
+    var before = Object.assign({}, m.scores);
+    CRITERIA.forEach(function(c){
+      var nv = Math.max(0, Math.min(100, Math.round(Number(fm.vals[c.key]))));
+      var d = nv - before[c.key];
+      if (isFinite(d) && d !== 0){
+        if (!changed && !m.aiScores) m.aiScores = before;   // keep what the system had given
+        m.scores[c.key] = nv; recordFix(c.key, d, dom); changed++;
+      }
+    });
+    state.fixModal = null;
+    if (!changed){ render(); showToast('바꾼 점수가 없어요.'); return; }
+    m.fixCount = (m.fixCount || 0) + 1; m.fixedAt = Date.now();
+    if (fm.reason) m.fixReason = fm.reason;
+    saveMaterials();
+    if (dom) pushDomainFix(dom);
+    render();
+    showToast('정정을 저장했어요. (' + changed + '개 항목)');
+  }
+  function fixStatsView(){
+    var rows = state.materials.filter(function(m){ return m.aiScores; });
+    var out = { n: rows.length, byKey: [], early: null, late: null };
+    if (!rows.length) return out;
+    CRITERIA.forEach(function(c){
+      var n = 0, abs = 0, sum = 0;
+      rows.forEach(function(m){ var d = m.scores[c.key] - m.aiScores[c.key]; if (d !== 0){ n++; abs += Math.abs(d); sum += d; } });
+      if (n) out.byKey.push({ label: c.label, n: n, mean: sum / n, abs: abs / n });
+    });
+    out.byKey.sort(function(a, b){ return b.n - a.n; });
+    var sorted = rows.slice().sort(function(a, b){ return (a.fixedAt || 0) - (b.fixedAt || 0); });
+    var gap = function(m){ var t = 0; CRITERIA.forEach(function(c){ t += Math.abs(m.scores[c.key] - m.aiScores[c.key]); }); return t / CRITERIA.length; };
+    if (sorted.length >= 6){
+      var h = Math.floor(sorted.length / 2);
+      var avg = function(a){ return a.reduce(function(t, m){ return t + gap(m); }, 0) / a.length; };
+      out.early = avg(sorted.slice(0, h)); out.late = avg(sorted.slice(-h));
+    }
+    return out;
+  }
+  function fixBlockHtml(){
+    var v = fixStatsView();
+    var html = '<p class="section-title">AI 점수 정정 기록</p>';
+    if (!v.n) return html + '<p style="font-size:15px;color:var(--cream-soft);line-height:1.7;margin:0 0 26px;">카드나 자료함의 "점수 정정"으로 AI 점수를 고치면 여기에 쌓여요. 정정은 내 기준 학습에 쓰이고, 쌓일수록 이후 AI 점수가 조금씩 보정돼요. (한 번 고친 건 영향이 아주 작아요)</p>';
+    html += '<div class="stat-grid"><div class="stat-box"><div class="n">' + v.n + '</div><div class="l">정정한 자료</div></div>' +
+      '<div class="stat-box"><div class="n">' + (v.byKey[0] ? escapeHtml(v.byKey[0].label) : '-') + '</div><div class="l">가장 많이 고친 기준</div></div></div>' +
+      v.byKey.slice(0, 5).map(function(k){
+        return '<div class="dist-row"><span>' + escapeHtml(k.label) + '</span><span>' + k.n + '번 · 평균 ' + (k.mean > 0 ? '+' : '') + Math.round(k.mean) + '점</span></div>';
+      }).join('');
+    var note = '정정은 "틀렸다고 느낀 자료"만 모인 값이라 AI 전체 정확도는 아니에요.';
+    if (v.early !== null) note += ' 처음 정정과 최근 정정의 평균 차이: ' + Math.round(v.early) + '점 → ' + Math.round(v.late) + '점' + (v.late < v.early ? ' (AI가 내 기준에 가까워지고 있어요)' : '') + '.';
+    return html + '<p class="help-note" style="margin:10px 0 26px;">' + escapeHtml(note) + '</p>';
+  }
+
+  // ---- 의견 보내기 ----
+  var FB_CATS = [['good', '좋았던 점'], ['bad', '불편한 점'], ['bug', '오류'], ['idea', '아이디어']];
+  function openFeedback(source){
+    state.fbModal = { source: source, cat: '', rating: 0, text: '', msg: null, busy: false };
+    render();
+  }
+  function maybeAskFeedback(){
+    if (!state.loaded || state.isAdmin || state.fbModal || state.tutorialOpen || state.updatePopup || state.annPopup || state.fixModal) return;
+    if (state.activity >= state.fbNext) openFeedback('ask');
+  }
+  function fbModalHtml(){
+    var f = state.fbModal, ask = f.source === 'ask';
+    var cats = FB_CATS.map(function(c){
+      return '<button type="button" data-fbcat="' + c[0] + '" class="btn small ' + (f.cat === c[0] ? '' : 'ghost') + '" style="margin:0 6px 6px 0;' + (f.cat === c[0] ? '' : 'color:var(--ink);border-color:rgba(32,40,31,0.35);') + '">' + c[1] + '</button>';
+    }).join('');
+    var stars = [1, 2, 3, 4, 5].map(function(n){
+      return '<button type="button" data-fbrate="' + n + '" aria-label="' + n + '점" style="background:none;border:0;cursor:pointer;font-size:26px;padding:0 3px;color:' + (n <= f.rating ? 'var(--gold)' : 'rgba(32,40,31,0.25)') + ';">★</button>';
+    }).join('');
+    return '<div class="modal-overlay" id="fb-overlay" style="z-index:65;"><div class="modal tut-modal" role="dialog" aria-modal="true" style="max-height:92vh;overflow-y:auto;">' +
+      '<button type="button" class="tut-close" id="fb-close-x" aria-label="닫기">' + ICONS.x + '</button>' +
+      '<div class="tut-count">' + (ask ? '잠깐만요' : '의견 보내기') + '</div>' +
+      '<h3 style="margin-top:10px;">' + (ask ? '쓰면서 어땠나요?' : '의견을 들려주세요') + '</h3>' +
+      '<p class="tut-hint" style="margin:0 0 14px;font-size:14.5px;line-height:1.6;">' + (ask ? '카드 평가와 자료 수집을 많이 해 주셨어요. 좋았던 점이나 불편했던 점을 한 번만 알려주세요. 앱을 고치는 데 큰 도움이 돼요.' : '좋았던 점, 불편한 점, 오류, 아이디어 무엇이든 괜찮아요.') + ' 이메일은 보내지지 않아요. (관리자는 누가 보냈는지 구분할 수 있어요)</p>' +
+      '<div style="margin-bottom:8px;">' + cats + '</div>' +
+      '<div style="margin:6px 0 10px;font-size:14.5px;">쓰기 편한가요? ' + stars + '</div>' +
+      '<div class="field"><label style="color:var(--ink-soft);">내용</label><textarea id="fb-text" rows="5" maxlength="500" style="width:100%;" placeholder="예: 신뢰도 점수가 블로그에도 너무 높게 나와요">' + escapeHtml(f.text) + '</textarea></div>' +
+      (f.msg ? '<p class="acct-msg ' + f.msg.type + '" style="margin:0 0 10px;">' + escapeHtml(f.msg.text) + '</p>' : '') +
+      '<div class="tut-actions"><span>' + (ask ? '<button type="button" class="tut-skip" id="fb-never">다시 묻지 않기</button>' : '') + '</span><div class="right">' +
+        (ask ? '<button type="button" class="btn ghost small" id="fb-later" style="color:var(--ink);border-color:rgba(32,40,31,0.35);">나중에</button>' : '') +
+        '<button type="button" class="btn small" id="fb-send" ' + (f.busy ? 'disabled' : '') + '>' + (f.busy ? '보내는 중...' : '보내기') + '</button></div></div>' +
+      '</div></div>';
+  }
+  function closeFeedback(mode){
+    var f = state.fbModal;
+    if (f && f.source === 'ask'){
+      if (mode === 'never') state.fbNext = 1000000000;
+      else state.fbNext = state.activity + 100;   // sent / later / closed: ask again only after 100 more actions
+      persistAppData();
+    }
+    state.fbModal = null; render();
+  }
+  function sendFeedback(){
+    var f = state.fbModal; if (!f || f.busy) return;
+    var ta = document.getElementById('fb-text'); if (ta) f.text = ta.value;
+    var text = (f.text || '').trim();
+    if (!f.cat){ f.msg = { type: 'err', text: '종류(좋았던 점 / 불편한 점 / 오류 / 아이디어)를 하나 골라주세요.' }; render(); return; }
+    if (!text && !f.rating){ f.msg = { type: 'err', text: '내용이나 별점 중 하나는 적어주세요.' }; render(); return; }
+    f.busy = true; f.msg = null; render();
+    var id = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    var doc = { ownerUid: state.user.uid, name: (state.displayName || '').slice(0, 30), category: f.cat, rating: f.rating || null,
+      text: text.slice(0, 500), tab: state.tab, ver: APP_VERSION, activity: state.activity, createdAt: Date.now(), status: 'new' };
+    fbDb.collection('feedback').doc(id).set(doc).then(function(){
+      closeFeedback('sent'); showToast('의견을 보냈어요. 고마워요!');
+    }).catch(function(err){
+      f.busy = false;
+      f.msg = { type: 'err', text: (err && err.code === 'permission-denied') ? '의견을 보내지 못했어요. 관리자에게 알려주세요 (설정 확인 필요).' : '의견을 보내지 못했어요. 잠시 후 다시 시도해주세요.' };
+      render();
+    });
+  }
+  function adminLoadFb(){
+    var fb = state.admin.fb;
+    if (fb.loading) return;
+    fb.loading = true; fb.err = null; render();
+    fbDb.collection('feedback').orderBy('createdAt', 'desc').limit(200).get().then(function(snap){
+      var list = []; snap.forEach(function(d){ var x = d.data(); x.id = d.id; list.push(x); });
+      fb.list = list; fb.loading = false; render();
+    }).catch(function(err){ fb.loading = false; fb.list = fb.list || []; fb.err = adminErrMsg(err); render(); });
+  }
+  function adminFbHtml(){
+    var fb = state.admin.fb;
+    if (!fb.list && !fb.loading && !fb.err) setTimeout(adminLoadFb, 0);
+    var html = '';
+    if (fb.err) html += '<p class="acct-msg err" style="margin:0 0 12px;">' + escapeHtml(fb.err) + '</p>';
+    if (fb.loading && !fb.list) return html + '<p class="sm-hint">불러오는 중...</p>';
+    var list = fb.list || [];
+    var catName = {}; FB_CATS.forEach(function(c){ catName[c[0]] = c[1]; });
+    var shown = list.filter(function(x){ return fb.filter === 'all' || (fb.filter === 'new' ? x.status !== 'done' : x.status === 'done') || catName[x.category] === fb.filter; });
+    var newCount = list.filter(function(x){ return x.status !== 'done'; }).length;
+    var rated = list.filter(function(x){ return x.rating; });
+    var avg = rated.length ? (rated.reduce(function(t, x){ return t + x.rating; }, 0) / rated.length).toFixed(1) : '-';
+    html += '<div class="help-steps" style="margin:0 0 16px;"><div class="help-step"><span class="no">받은 의견</span><h4>' + list.length + '개</h4></div><div class="help-step"><span class="no">아직 안 본 것</span><h4>' + newCount + '개</h4></div><div class="help-step"><span class="no">쓰기 편한가요 평균</span><h4>' + avg + ' / 5</h4></div></div>';
+    html += '<div class="field" style="max-width:220px;"><label>보기</label><select id="ad-fb-filter">' + [['new', '안 본 것'], ['done', '처리함'], ['all', '전체']].concat(FB_CATS.map(function(c){ return [c[1], c[1]]; })).map(function(o){ return '<option value="' + o[0] + '"' + (fb.filter === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select> <button class="btn ghost small" id="ad-fb-refresh" style="margin-top:8px;">새로고침</button></div>';
+    shown.forEach(function(x){
+      html += '<div class="acct-block" style="margin-bottom:10px;' + (x.status === 'done' ? 'opacity:.6;' : '') + '"><div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-bottom:6px;">' +
+        '<span class="chip">' + escapeHtml(catName[x.category] || x.category || '') + '</span>' +
+        (x.rating ? '<span style="color:var(--gold);">' + '★'.repeat(x.rating) + '<span style="opacity:.3;">' + '★'.repeat(5 - x.rating) + '</span></span>' : '') +
+        '<span style="color:var(--cream-soft);font-size:13px;">' + escapeHtml(x.name || ('이름 없음 · ' + String(x.ownerUid || '').slice(0, 6))) + ' · ' + escapeHtml(x.tab || '') + ' · v' + escapeHtml(x.ver || '') + ' · 활동 ' + (x.activity || 0) + '회 · ' + adminFmt(x.createdAt) + '</span></div>' +
+        '<p style="margin:0 0 10px;font-size:15px;line-height:1.7;white-space:pre-wrap;">' + escapeHtml(x.text || '(별점만)') + '</p>' +
+        '<button class="btn ghost small" data-adfbdone="' + escapeHtml(x.id) + '">' + (x.status === 'done' ? '다시 안 본 것으로' : '처리함으로') + '</button> ' +
+        '<button class="btn ghost small" data-adfbdel="' + escapeHtml(x.id) + '">삭제</button></div>';
+    });
+    if (!shown.length) html += '<p class="sm-hint">표시할 의견이 없어요.</p>';
+    return html;
   }
 
   // ---- 관리자 모드 / 공지 / AI 한도 ----
@@ -4607,6 +4896,7 @@
       if (!state.user || state.user.uid !== uid0) return;
       var a = state.announcement;
       if (a && a.active && a.id && a.id !== state.seenAnnouncement && !state.annPopup) state.annPopup = a;
+      maybeAskFeedback();
       render();
     });
   }
@@ -4766,7 +5056,7 @@
   function adminTabHtml(){
     var ad = state.admin;
     if (!state.isAdmin) return '<div class="empty"><h3>관리자만 볼 수 있어요</h3></div>';
-    var subs = [['stats', '현황'], ['users', '사용자'], ['ai', 'AI 설정'], ['ann', '공지'], ['groups', '그룹 · 링크']];
+    var subs = [['stats', '현황'], ['users', '사용자'], ['ai', 'AI 설정'], ['fb', '의견'], ['ann', '공지'], ['groups', '그룹 · 링크']];
     var html = '<p class="section-title">관리자</p>' +
       '<div class="compare-controls"><div class="mode-toggle">' + subs.map(function(x){
         return '<button data-adsub="' + x[0] + '" class="' + (ad.sub === x[0] ? 'active' : '') + '">' + x[1] + '</button>';
@@ -4775,6 +5065,7 @@
     if (ad.sub === 'stats') html += adminStatsHtml();
     else if (ad.sub === 'users') html += adminUsersHtml();
     else if (ad.sub === 'ai') html += adminAiHtml();
+    else if (ad.sub === 'fb') html += adminFbHtml();
     else if (ad.sub === 'ann') html += adminAnnHtml();
     else html += adminGlHtml();
     return html;
@@ -5033,6 +5324,28 @@
   function attachAdminHandlers(){
     var ad = state.admin;
     var $ = function(id){ return document.getElementById(id); };
+    // 점수 정정
+    document.querySelectorAll('[data-fix]').forEach(function(b){
+      b.addEventListener('click', function(e){ e.stopPropagation(); openFix(b.getAttribute('data-fix')); });
+    });
+    document.querySelectorAll('[data-fixkey]').forEach(function(r){
+      r.addEventListener('input', function(){
+        var k = r.getAttribute('data-fixkey'), v = parseInt(r.value, 10);
+        if (state.fixModal) state.fixModal.vals[k] = v;
+        var lab = document.getElementById('fix-val-' + k); if (lab) lab.textContent = v;
+      });
+    });
+    var fixReason = $('fix-reason'); if (fixReason) fixReason.addEventListener('change', function(){ state.fixModal.reason = fixReason.value; });
+    var fixSave = $('fix-save'); if (fixSave) fixSave.addEventListener('click', saveFix);
+    var fixCancel = $('fix-cancel'); if (fixCancel) fixCancel.addEventListener('click', function(){ state.fixModal = null; render(); });
+    var fixX = $('fix-close-x'); if (fixX) fixX.addEventListener('click', function(){ state.fixModal = null; render(); });
+    // 의견 보내기
+    document.querySelectorAll('[data-fbcat]').forEach(function(b){ b.addEventListener('click', function(){ var ta = $('fb-text'); if (ta) state.fbModal.text = ta.value; state.fbModal.cat = b.getAttribute('data-fbcat'); state.fbModal.msg = null; render(); }); });
+    document.querySelectorAll('[data-fbrate]').forEach(function(b){ b.addEventListener('click', function(){ var ta = $('fb-text'); if (ta) state.fbModal.text = ta.value; var n = parseInt(b.getAttribute('data-fbrate'), 10); state.fbModal.rating = state.fbModal.rating === n ? 0 : n; render(); }); });
+    var fbSend = $('fb-send'); if (fbSend) fbSend.addEventListener('click', sendFeedback);
+    var fbLater = $('fb-later'); if (fbLater) fbLater.addEventListener('click', function(){ closeFeedback('later'); });
+    var fbNever = $('fb-never'); if (fbNever) fbNever.addEventListener('click', function(){ closeFeedback('never'); });
+    var fbX = $('fb-close-x'); if (fbX) fbX.addEventListener('click', function(){ closeFeedback('later'); });
     var annOk = $('ann-ok'); if (annOk) annOk.addEventListener('click', dismissAnn);
     var annX = $('ann-close-x'); if (annX) annX.addEventListener('click', dismissAnn);
     if (state.tab !== 'admin' || !state.isAdmin) return;
@@ -5047,6 +5360,18 @@
     var glr = $('ad-gl-refresh'); if (glr) glr.addEventListener('click', adminLoadGl);
     var defSave = $('ad-def-save'); if (defSave) defSave.addEventListener('click', adminSaveDefault);
     document.querySelectorAll('[data-adperiod]').forEach(function(b){ b.addEventListener('click', function(){ ad.period = b.getAttribute('data-adperiod'); render(); }); });
+    var fbFilter = $('ad-fb-filter'); if (fbFilter) fbFilter.addEventListener('change', function(){ ad.fb.filter = fbFilter.value; render(); });
+    var fbRef = $('ad-fb-refresh'); if (fbRef) fbRef.addEventListener('click', adminLoadFb);
+    document.querySelectorAll('[data-adfbdone]').forEach(function(b){ b.addEventListener('click', function(){
+      var id = b.getAttribute('data-adfbdone'), x = (ad.fb.list || []).filter(function(y){ return y.id === id; })[0]; if (!x) return;
+      var st = x.status === 'done' ? 'new' : 'done';
+      fbDb.collection('feedback').doc(id).update({ status: st }).then(function(){ x.status = st; render(); }).catch(function(err){ ad.msg = { type: 'err', text: adminErrMsg(err) }; render(); });
+    }); });
+    document.querySelectorAll('[data-adfbdel]').forEach(function(b){ b.addEventListener('click', function(){
+      if (!confirm('이 의견을 삭제할까요?')) return;
+      var id = b.getAttribute('data-adfbdel');
+      fbDb.collection('feedback').doc(id).delete().then(function(){ ad.fb.list = ad.fb.list.filter(function(y){ return y.id !== id; }); render(); }).catch(function(err){ ad.msg = { type: 'err', text: adminErrMsg(err) }; render(); });
+    }); });
     var aiSave = $('ad-ai-save'); if (aiSave) aiSave.addEventListener('click', adminSaveAi);
     var aiList = $('ad-ai-list'); if (aiList) aiList.addEventListener('click', adminListModels);
     document.querySelectorAll('[data-ad-model]').forEach(function(b){ b.addEventListener('click', function(){ readAiForm(); ad.aiForm.model = b.getAttribute('data-ad-model'); render(); }); });
