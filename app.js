@@ -317,6 +317,7 @@
       sharedLinks: state.sharedLinks,
       displayName: state.displayName,
       aiUsage: state.aiUsage,
+      fieldModel: state.fieldModel,
       updatedAt: Date.now()
     };
     // keep the published share snapshot in step with what was just saved
@@ -388,6 +389,7 @@
     rejFilter: 'all',
     tutorialOpen: false, tutorialStep: 0, tutorialDone: false,
     apv: { q: '', field: 'all', sort: 'recent' },
+    fieldModel: {}, profileField: 'all',
     sel: {}, selVisible: [], shareModal: null,
     sharedLinks: [], displayName: '', viewer: null, aiUsage: null,
     groups: { list: null, loading: false, busy: false, err: null, msg: null, active: null, items: null, itemsLoading: false, itemsErr: null, filter: 'all', newName: '', joinCode: '' },
@@ -420,6 +422,16 @@
     });
     state.weights = state.weights || {};
     CRITERIA.forEach(function(c){ if (typeof state.weights[c.key] !== 'number') state.weights[c.key] = 0; });
+    if (state.fieldModel && typeof state.fieldModel === 'object'){
+      Object.keys(state.fieldModel).forEach(function(f){
+        var fm = state.fieldModel[f];
+        if (!fm || typeof fm !== 'object'){ delete state.fieldModel[f]; return; }
+        fm.d = fm.d || {};
+        TASTE_KEYS.forEach(function(k){ if (typeof fm.d[k] !== 'number') fm.d[k] = 0; });
+        if (typeof fm.b !== 'number') fm.b = 0;
+        if (typeof fm.n !== 'number') fm.n = 0;
+      });
+    }
   }
 
   async function loadState(isNewUser){
@@ -432,7 +444,7 @@
       state.issues = [];
       state.sharing = { code: null, nickname: '', includeTitles: true };
       state.importedProfiles = [];
-      state.sharedLinks = []; state.displayName = ''; state.aiUsage = null;
+      state.sharedLinks = []; state.displayName = ''; state.aiUsage = null; state.fieldModel = {};
       normalizeCriteriaData();
       state.tutorialDone = false; state.tutorialOpen = true; state.tutorialStep = 0;
       state.loaded = true;
@@ -481,6 +493,7 @@
       state.sharedLinks = Array.isArray(data.sharedLinks) ? data.sharedLinks : [];
       state.displayName = typeof data.displayName === 'string' ? data.displayName : '';
       state.aiUsage = (data.aiUsage && typeof data.aiUsage === 'object') ? data.aiUsage : null;
+      state.fieldModel = (data.fieldModel && typeof data.fieldModel === 'object') ? data.fieldModel : null;
     } else {
       // account exists but has never saved anything: start from seed data
       state.materials = seedMaterials();
@@ -489,16 +502,20 @@
       state.issues = [];
       state.sharing = { code: null, nickname: '', includeTitles: true };
       state.importedProfiles = [];
-      state.sharedLinks = []; state.displayName = ''; state.aiUsage = null;
+      state.sharedLinks = []; state.displayName = ''; state.aiUsage = null; state.fieldModel = {};
       state.tutorialDone = false;
       state.loaded = true;
       persistAppData();
     }
 
     normalizeCriteriaData();
+    var rebuilt = false;
+    if (!state.fieldModel) rebuilt = rebuildFieldModel();   // older account: derive field offsets from past decisions
+    state.profileField = 'all';
     state.tutorialOpen = !state.tutorialDone; state.tutorialStep = 0;
     state.loaded = true;
     render();
+    if (rebuilt) persistAppData();
     if (data && !(data.paged && data.paged.v === 2)) persistAppData();   // one-time move to the paged layout
   }
 
@@ -509,17 +526,86 @@
 
   function sigmoid(z){ return 1/(1+Math.exp(-z)); }
 
-  function trainStep(vec, label){
-    var lr = 0.15;
-    var z = state.bias;
-    CRITERIA.forEach(function(c){ z += (state.weights[c.key]||0) * (vec[c.key]||0); });
-    var pred = sigmoid(z);
-    var err = label - pred;
+  // ---- per-field taste model ----
+  // Quality criteria (trust, objectivity, lowBias, recency) mean the same thing
+  // in every subject, so they keep ONE global weight. Taste/level criteria
+  // (appropriateness, clarity, interest, plus expertise and depth, which decide
+  // how advanced a source is) are personal and differ by subject: a strong
+  // science student may want expert, deep papers in science but plain
+  // explanations in social studies. Each field therefore learns its own small
+  // offset on top of the global weight (simulation: ~0.72 accuracy after 56
+  // cards vs ~0.45 for a single global model). state.fieldModel[field] = { d:{taste weight offsets}, b:bias offset, n:count }.
+  var TASTE_KEYS = ['appropriateness', 'clarity', 'interest', 'expertise', 'depth'];
+  function isTaste(k){ return TASTE_KEYS.indexOf(k) !== -1; }
+  function fieldEntry(field, create){
+    if (!field) return null;
+    var fm = state.fieldModel[field];
+    if (!fm && create){
+      fm = state.fieldModel[field] = { d: {}, b: 0, n: 0 };
+      TASTE_KEYS.forEach(function(k){ fm.d[k] = 0; });
+    }
+    return fm || null;
+  }
+  function weightsFor(field){
+    var fm = fieldEntry(field, false), w = {};
+    CRITERIA.forEach(function(c){
+      w[c.key] = (state.weights[c.key] || 0) + ((fm && isTaste(c.key)) ? (fm.d[c.key] || 0) : 0);
+    });
+    return w;
+  }
+  function biasFor(field){
+    var fm = fieldEntry(field, false);
+    return state.bias + (fm ? (fm.b || 0) : 0);
+  }
+  function fieldDecisionCount(field){
+    var fm = fieldEntry(field, false);
+    return fm ? fm.n : 0;
+  }
+
+  // field: the subject of the card(s) being learned from. diffMode: vec is an
+  // A-minus-B difference (상대 비교), where an intercept makes no sense.
+  function trainStep(vec, label, field, diffMode){
+    var lr = 0.15, dlr = 0.5, shrink = 0.02;
+    var w = weightsFor(field);
+    var z = biasFor(field);
+    CRITERIA.forEach(function(c){ z += w[c.key] * (vec[c.key] || 0); });
+    var err = label - sigmoid(z);
     var newW = {};
-    CRITERIA.forEach(function(c){ newW[c.key] = (state.weights[c.key]||0) + lr*err*(vec[c.key]||0); });
+    CRITERIA.forEach(function(c){ newW[c.key] = (state.weights[c.key] || 0) + lr * err * (vec[c.key] || 0); });
     state.weights = newW;
-    state.bias = state.bias + lr*err;
+    state.bias = state.bias + lr * err;
+    var fm = fieldEntry(field, true);
+    if (fm){
+      TASTE_KEYS.forEach(function(k){ fm.d[k] = fm.d[k] * (1 - shrink) + dlr * err * (vec[k] || 0); });
+      if (!diffMode) fm.b = fm.b * (1 - shrink) + 0.1 * err;
+      fm.n += 1;
+    }
     state.trained += 1;
+  }
+
+  // One-time: accounts created before per-field learning have decisions but no
+  // field offsets. Fit the offsets on top of the (already trained) global weights
+  // by replaying past decisions; the global weights are left untouched.
+  function rebuildFieldModel(){
+    state.fieldModel = {};
+    var rows = state.materials.filter(function(m){
+      return (m.status === 'approved' || m.status === 'rejected') && m.field;
+    }).sort(function(a, b){ return (a.decidedAt || a.createdAt || 0) - (b.decidedAt || b.createdAt || 0); });
+    if (!rows.length) return false;
+    var dlr = 0.5, shrink = 0.02;
+    for (var ep = 0; ep < 3; ep++){
+      rows.forEach(function(m){
+        var fm = fieldEntry(m.field, true);
+        var vec = scoreVec(m), w = weightsFor(m.field);
+        var z = biasFor(m.field);
+        CRITERIA.forEach(function(c){ z += w[c.key] * vec[c.key]; });
+        var err = (m.status === 'approved' ? 1 : 0) - sigmoid(z);
+        TASTE_KEYS.forEach(function(k){ fm.d[k] = fm.d[k] * (1 - shrink) + dlr * err * vec[k]; });
+        fm.b = fm.b * (1 - shrink) + 0.1 * err;
+        if (ep === 0) fm.n += 1;
+      });
+    }
+    return true;
   }
 
   function scoreVec(material){
@@ -529,8 +615,9 @@
   }
 
   function predictFit(material){
-    var z = state.bias;
-    CRITERIA.forEach(function(c){ z += (state.weights[c.key]||0) * ((material.scores[c.key]||0)/100); });
+    var w = weightsFor(material.field);
+    var z = biasFor(material.field);
+    CRITERIA.forEach(function(c){ z += w[c.key] * ((material.scores[c.key]||0)/100); });
     return sigmoid(z);
   }
 
@@ -560,7 +647,7 @@
     // remember what the learned model predicted BEFORE it learns from this decision
     material.predFit = Math.round(predictFit(material) * 100) / 100;
     material.predN = state.trained;
-    trainStep(scoreVec(material), approve ? 1 : 0);
+    trainStep(scoreVec(material), approve ? 1 : 0, material.field);
     saveMaterials(); saveModel();
     state.pendingReject = null;
     state.summaryLoading = false; state.summaryError = null; state.summaryTargetId = null;
@@ -1007,9 +1094,11 @@
   function fmtWeight(w){ return (w >= 0 ? '+' : '') + w.toFixed(2); }
 
   // Reject reasons with counts, biggest first (same data as the 성향 분석 tab).
-  function rejectReasonStats(){
+  function rejectReasonStats(field){
     var counts = {}, total = 0;
+    var inField = field ? state.materials.filter(function(m){ return m.status === 'rejected' && m.field === field; }).length : 0;
     state.materials.forEach(function(m){
+      if (field && inField >= 3 && m.field !== field) return;   // enough in this field: use only its reasons
       if (m.status === 'rejected' && m.rejectReason){ counts[m.rejectReason] = (counts[m.rejectReason]||0) + 1; total++; }
     });
     var list = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; })
@@ -1017,14 +1106,17 @@
     return { list: list, total: total };
   }
 
-  function ownProfile(){
+  // fieldOverride: judge by the taste learned for that subject (분별 수집 of one field).
+  function ownProfile(fieldOverride){
     var approved = state.materials.filter(function(m){ return m.status==='approved'; });
     var rejected = state.materials.filter(function(m){ return m.status==='rejected'; });
-    var brief = buildProfileBrief(approved, '');
+    var brief = buildProfileBrief(approved, fieldOverride || '');
+    var rejInField = rejected.filter(function(m){ return m.field === brief.field; });
+    if (rejInField.length) rejected = rejInField;
     return {
       source: 'self', label: '내 성향', field: brief.field,
-      weights: state.weights, bias: state.bias, trained: state.trained,
-      rejStats: rejectReasonStats(),
+      weights: weightsFor(brief.field), bias: biasFor(brief.field), trained: state.trained,
+      rejStats: rejectReasonStats(brief.field),
       sampleTitles: brief.sampleTitles,
       rejectExamples: rejected.slice(-5).map(function(m){ return '"' + m.title + '" (' + (m.rejectReason || '기타') + ')'; }),
       hasData: state.trained > 0 && approved.length > 0
@@ -1061,7 +1153,7 @@
   // (shared ones are fetched on demand and cached in state.bulk.sel.sharedCache).
   function selectedProfileInfo(){
     var s = state.bulk.sel;
-    if (!s.source || s.source === 'self') return { profile: ownProfile() };
+    if (!s.source || s.source === 'self') return { profile: ownProfile(s.field) };
     var cached = s.sharedCache[s.source];
     if (!cached) return { pending: true };
     if (cached.error) return { error: cached.error };
@@ -1709,10 +1801,11 @@
     return best;
   }
 
-  function topCriteriaByWeight(n){
+  function topCriteriaByWeight(n, field){
+    var w = weightsFor(field);
     return CRITERIA.slice()
-      .filter(function(c){ return (state.weights[c.key]||0) > 0.02; })
-      .sort(function(a,b){ return (state.weights[b.key]||0) - (state.weights[a.key]||0); })
+      .filter(function(c){ return (w[c.key]||0) > 0.02; })
+      .sort(function(a,b){ return (w[b.key]||0) - (w[a.key]||0); })
       .slice(0, n);
   }
 
@@ -1727,8 +1820,9 @@
   // drive the search itself and to show the person what's being used.
   function buildProfileBrief(approved, manualField){
     var field = manualField || topFieldByApproval(approved);
-    var criteria = topCriteriaByWeight(3);
-    var topFitTitles = approved.slice()
+    var criteria = topCriteriaByWeight(3, field);
+    var inField = approved.filter(function(m){ return m.field === field; });
+    var topFitTitles = (inField.length ? inField : approved).slice()
       .sort(function(a,b){ return predictFit(b) - predictFit(a); })
       .slice(0, 3)
       .map(function(m){ return m.title; });
@@ -2006,7 +2100,7 @@
       ['반려 자료함', '반려한 자료와 그 이유를 볼 수 있어요. 이유별로 거르거나, 마음이 바뀌면 되돌릴 수 있어요.'],
       ['공유 · 그룹', '승인·반려 자료함에서 자료를 체크하면 <b>공유 링크</b>를 만들거나 <b>그룹</b>에 넣을 수 있어요. 링크는 로그인 없이 읽기 전용으로 열려요. 그룹은 학급·동아리처럼 코드를 아는 사람끼리 쓰는 공간이고, 친구가 넣은 자료는 "내 서고에 담기"로 내 대기 목록에 가져와 직접 평가할 수 있어요.'],
       ['상대 비교', '승인한 자료 두 개를 기준별로 맞대어 비교해요. 비교할수록 점수가 더 정교해져요.'],
-      ['성향 분석', '<b>AI 예측 적중률</b>(프로그램이 예측한 값과 내 실제 결정이 얼마나 맞았는지), 내가 중요하게 여기는 기준과 반려 이유 분포를 볼 수 있어요. 맨 아래 <b>내 성향 공유하기</b>에서 공유 코드를 만들면, 다른 사람이 분별 수집에서 내 기준을 쓸 수 있어요. 모둠 과제에서 선별 기준을 맞출 때 쓸 수 있어요.'],
+      ['성향 분석', '분야를 고르면 그 분야에서의 내 기준을 따로 볼 수 있어요(예: 과학은 어려운 자료도 OK, 사회는 쉬운 게 좋아요). <b>AI 예측 적중률</b>(프로그램이 예측한 값과 내 실제 결정이 얼마나 맞았는지), 내가 중요하게 여기는 기준과 반려 이유 분포를 볼 수 있어요. 맨 아래 <b>내 성향 공유하기</b>에서 공유 코드를 만들면, 다른 사람이 분별 수집에서 내 기준을 쓸 수 있어요. 모둠 과제에서 선별 기준을 맞출 때 쓸 수 있어요.'],
       ['설정', 'AI 모델 선택과 연결 테스트, 데이터 초기화, 계정 관리를 할 수 있어요.']
     ];
     var guideHtml = guide.map(function(g){
@@ -2949,11 +3043,18 @@
     var n = rows.length;
     var isHit = function(m){ return (m.predFit >= 0.5) === (m.status === 'approved'); };
     var apv = rows.filter(function(m){ return m.status === 'approved'; }).length;
-    var out = { n: n, hit: 0, acc: null, baseline: null, auc: null, recent: null, buckets: [] };
+    var out = { n: n, hit: 0, acc: null, baseline: null, auc: null, recent: null, buckets: [], byField: [] };
     if (!n) return out;
     out.hit = rows.filter(isHit).length;
     out.acc = out.hit / n;
     out.baseline = Math.max(apv, n - apv) / n;
+    var perField = {};
+    rows.forEach(function(m){
+      var f = perField[m.field] || (perField[m.field] = { field: m.field, n: 0, hit: 0 });
+      f.n++; if (isHit(m)) f.hit++;
+    });
+    out.byField = Object.keys(perField).map(function(k){ return perField[k]; })
+      .filter(function(f){ return f.n >= 5; }).sort(function(a, b){ return b.n - a.n; });
     var tail = rows.slice(-20);
     out.recent = tail.filter(isHit).length / tail.length;
     for (var i = 0; i + 10 <= n; i += 10){
@@ -2988,6 +3089,10 @@
         return '<div class="acc-col"><div class="acc-bar" style="height:' + Math.max(4, Math.round(v * 56)) + 'px;"></div><span>' + Math.round(v * 100) + '</span><em>' + (i * 10 + 1) + '~' + (i * 10 + 10) + '</em></div>';
       }).join('') + '</div>';
     }
+    if (st.byField.length >= 2){
+      html += '<div style="margin:6px 0 4px;font-family:var(--font-mono);font-size:12.5px;color:var(--cream-soft);">분야별 적중률 (5장 이상)</div>' +
+        st.byField.map(function(f){ return '<div class="dist-row"><span>' + escapeHtml(f.field) + '</span><span>' + pct(f.hit / f.n) + ' (' + f.n + '장)</span></div>'; }).join('');
+    }
     var verdict;
     if (st.n < 20) verdict = '아직 ' + st.n + '장이라 표본이 적어요. 20장 이상 쌓이면 더 믿을 만해요.';
     else if (st.auc !== null && st.auc < 0.55) verdict = '아직 내 기준을 잘 못 맞히고 있어요. 점수 자체가 부정확하거나(AI가 제목만 보고 추정), 내 기준이 아직 일정하지 않을 수 있어요.';
@@ -3008,16 +3113,29 @@
     html += accuracyBlockHtml();
 
     html += '<p class="section-title">당신이 중요하게 여기는 기준</p>';
-    var maxAbs = Math.max.apply(null, CRITERIA.map(function(c){ return Math.abs(state.weights[c.key]||0); }).concat([0.001]));
-    var sorted = CRITERIA.slice().sort(function(a,b){ return (state.weights[b.key]||0) - (state.weights[a.key]||0); });
+    var decidedByField = {};
+    state.materials.forEach(function(m){ if ((m.status === 'approved' || m.status === 'rejected') && m.field) decidedByField[m.field] = (decidedByField[m.field] || 0) + 1; });
+    var fieldsHere = Object.keys(decidedByField).sort(function(a, b){ return decidedByField[b] - decidedByField[a]; });
+    if (state.profileField !== 'all' && !decidedByField[state.profileField]) state.profileField = 'all';
+    var pf = state.profileField === 'all' ? null : state.profileField;
+    var shown = pf ? weightsFor(pf) : state.weights;
+    if (fieldsHere.length){
+      html += '<div class="field" style="max-width:260px;"><select id="prof-field"><option value="all"' + (pf ? '' : ' selected') + '>전체 (모든 분야 합침)</option>' +
+        fieldsHere.map(function(f){ return '<option value="' + escapeHtml(f) + '"' + (pf === f ? ' selected' : '') + '>' + escapeHtml(f) + ' (' + decidedByField[f] + '장)</option>'; }).join('') + '</select></div>';
+      html += '<p class="sm-hint" style="margin:-6px 0 12px;">' + (pf
+        ? '<b>' + escapeHtml(pf) + '</b> 분야에서의 내 기준이에요. <b>분야별</b> 표시가 붙은 기준(적절성·이해하기 쉬움·관심도·전문성·정보 충실도)은 분야마다 따로 배워요.'
+        : '모든 분야를 합친 기준이에요. 분야를 고르면, 어려운 자료도 괜찮은 분야와 쉬운 게 좋은 분야처럼 분야마다 다른 취향을 볼 수 있어요.') + '</p>';
+    }
+    var maxAbs = Math.max.apply(null, CRITERIA.map(function(c){ return Math.abs(shown[c.key]||0); }).concat([0.001]));
+    var sorted = CRITERIA.slice().sort(function(a,b){ return (shown[b.key]||0) - (shown[a.key]||0); });
     if (state.trained === 0){
       html += '<p style="font-size:15px;color:var(--cream-soft);">아직 학습된 데이터가 없어요. 카드 평가나 상대 비교를 진행하면 이곳에 당신의 기준이 나타납니다.</p>';
     } else {
       sorted.forEach(function(c){
-        var w = state.weights[c.key]||0;
+        var w = shown[c.key]||0;
         var pct = Math.round(Math.abs(w)/maxAbs*100);
         var color = w >= 0 ? 'var(--approve)' : 'var(--reject)';
-        html += '<div class="weight-row"><div class="wl"><span>' + c.label + '</span><b>' + (w>=0?'+':'') + w.toFixed(2) + '</b></div>' +
+        html += '<div class="weight-row"><div class="wl"><span>' + c.label + (isTaste(c.key) ? ' <em class="taste-tag">분야별</em>' : '') + '</span><b>' + (w>=0?'+':'') + w.toFixed(2) + '</b></div>' +
           '<div class="weight-bar-bg"><div class="weight-bar" style="width:' + pct + '%;background:' + color + ';"></div></div></div>';
       });
     }
@@ -3025,7 +3143,7 @@
     if (rejected.length > 0){
       html += '<p class="section-title">반려 이유 분포</p>';
       var counts = {};
-      rejected.forEach(function(m){ counts[m.rejectReason] = (counts[m.rejectReason]||0)+1; });
+      rejected.filter(function(m){ return !pf || m.field === pf; }).forEach(function(m){ counts[m.rejectReason] = (counts[m.rejectReason]||0)+1; });
       Object.keys(counts).sort(function(a,b){ return counts[b]-counts[a]; }).forEach(function(k){
         html += '<div class="dist-row"><span>' + escapeHtml(k) + '</span><span>' + counts[k] + '건</span></div>';
       });
@@ -3569,7 +3687,7 @@
 
       var start;
       if (s.source === 'self'){
-        start = Promise.resolve(ownProfile());
+        start = Promise.resolve(ownProfile(s.field));
       } else {
         var code = s.source;
         start = fetchSharedProfile(code).then(function(doc){
@@ -3898,19 +4016,22 @@
         if (choice === 'A'){ matA.scores[cr.key] = Math.min(100, matA.scores[cr.key]+4); matB.scores[cr.key] = Math.max(0, matB.scores[cr.key]-4); }
         else if (choice === 'B'){ matB.scores[cr.key] = Math.min(100, matB.scores[cr.key]+4); matA.scores[cr.key] = Math.max(0, matA.scores[cr.key]-4); }
       });
-      trainStep(diff, c.overall === 'A' ? 1 : 0);
+      trainStep(diff, c.overall === 'A' ? 1 : 0, matA.field && matA.field === matB.field ? matA.field : null, true);
       saveMaterials(); saveModel();
       showToast('비교 결과가 반영되었어요');
       c.a = null; c.b = null; c.critAnswers = {}; c.overall = null;
       render();
     });
 
+    var profField = document.getElementById('prof-field');
+    if (profField) profField.addEventListener('change', function(){ state.profileField = profField.value; render(); });
+
     // profile
     var resetBtn = document.getElementById('reset-all');
     if (resetBtn) resetBtn.addEventListener('click', function(){
       if (!confirm('모든 자료와 학습 데이터를 초기화할까요? 이 작업은 되돌릴 수 없습니다.')) return;
       state.materials = seedMaterials();
-      state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
+      state.weights = zeroWeights(); state.bias = 0; state.trained = 0; state.fieldModel = {};
       state.issues = [];
       state.opinionsView.mode = 'list'; state.opinionsView.activeIssueId = null;
       saveMaterials(); saveModel(); saveIssues();
