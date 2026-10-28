@@ -528,3 +528,6 @@
     #archive-root .crit-choices { grid-template-columns: 1fr 1fr; }
     #archive-root .card-title { font-size: 20px; }
   }
+
+  /* per-field taste tag */
+  #archive-root .taste-tag { font-style: normal; font-family: var(--font-mono); font-size: 10.5px; color: var(--gold); border: 1px solid var(--line-dark); border-radius: 8px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px; }
