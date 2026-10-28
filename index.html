@@ -335,6 +335,42 @@
     #archive-root .apv-controls input[type=text] { min-width: 0; width: 100%; }
   }
 
+  /* Sharing / groups */
+  #archive-root .sel-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; padding: 10px 14px; margin: 0 0 14px; border: 1px solid var(--line-dark); border-radius: 4px; background: rgba(243,238,223,0.03); }
+  #archive-root .sel-bar label { display: flex; align-items: center; gap: 8px; font-size: 14.5px; color: var(--cream-soft); cursor: pointer; }
+  #archive-root .sel-bar .cnt { font-family: var(--font-mono); font-size: 13px; color: var(--gold); }
+  #archive-root .sel-bar .grow { flex: 1; }
+  #archive-root .sel-bar input[type=checkbox], #archive-root .sel-box input, #archive-root .sm-pick input, #archive-root .toggle-row input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--gold); margin: 0; }
+  #archive-root .sel-box { position: absolute; left: 14px; top: 16px; display: block; cursor: pointer; padding: 2px; }
+  #archive-root .apv-item.sel, #archive-root .rej-item.sel { position: relative; padding-left: 46px; }
+  #archive-root .apv-item.picked, #archive-root .rej-item.picked { border-color: var(--gold); background: rgba(200,155,60,0.06); }
+  #archive-root .rej-item .info { flex: 1; min-width: 0; }
+  #archive-root .pill { font-family: var(--font-mono); font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid currentColor; margin-left: 4px; white-space: nowrap; }
+  #archive-root .pill.ok { color: var(--approve); }
+  #archive-root .pill.no { color: var(--reject); }
+  #archive-root .apv-top h4 a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-dark); text-underline-offset: 3px; }
+  #archive-root .apv-top h4 a:hover { color: var(--gold); }
+  #archive-root .sh-sum, #archive-root .sh-note { margin: 10px 0 0; font-size: 14px; line-height: 1.65; color: var(--cream-soft); }
+  #archive-root .sh-sum b, #archive-root .sh-note b { color: var(--gold); font-weight: 500; margin-right: 4px; }
+  #archive-root .apv-actions { gap: 8px; flex-wrap: wrap; }
+  #archive-root .modal.share-modal { background: var(--bg); color: var(--cream); border: 1px solid var(--line-dark); max-width: 520px; max-height: 90vh; overflow: auto; }
+  #archive-root .modal.share-modal .sub2 { color: var(--cream-soft); line-height: 1.6; }
+  #archive-root .modal.share-modal .sub2 b { color: var(--cream); }
+  #archive-root .sm-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 6px; align-items: center; }
+  #archive-root .sm-hint { font-size: 13.5px; line-height: 1.6; color: var(--cream-soft); margin: 4px 0 8px; }
+  #archive-root .sm-hint b { color: var(--cream); }
+  #archive-root .sm-picks { display: flex; flex-direction: column; gap: 8px; }
+  #archive-root .sm-pick { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line-dark); border-radius: 4px; font-size: 15px; cursor: pointer; }
+  #archive-root .sm-pick span { margin-left: auto; font-family: var(--font-mono); font-size: 12.5px; color: var(--cream-soft); }
+  #archive-root .btn-link { display: inline-block; text-decoration: none; text-align: center; }
+  #archive-root .grp-card { display: block; width: 100%; text-align: left; background: transparent; color: var(--cream); border: 1px solid var(--line-dark); border-radius: 4px; padding: 14px 16px; margin-bottom: 10px; }
+  #archive-root .grp-card:hover { border-color: var(--gold); }
+  #archive-root .grp-card h4 { font-family: var(--font-display); font-size: 19px; margin: 0 0 4px; }
+  #archive-root .grp-card .meta2 { font-size: 13px; color: var(--cream-soft); }
+  #archive-root .viewer-brand { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin: 6px 0 14px; }
+  #archive-root .viewer-title { font-family: var(--font-display); font-size: 30px; line-height: 1.3; margin: 0 0 6px; font-weight: 500; word-break: keep-all; }
+  #archive-root .viewer-meta { font-size: 14px; color: var(--cream-soft); margin-bottom: 18px; }
+
   /* Compare */
   #archive-root .compare-controls { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; flex-wrap: wrap; }
   #archive-root .mode-toggle { display: flex; border: 1px solid var(--line-dark); border-radius: 20px; overflow: hidden; }
@@ -428,6 +464,55 @@
   #archive-root .reason-grid button:hover { border-color: var(--gold); }
   #archive-root .modal .cancel { width: 100%; background: transparent; border: 1px solid var(--paper-line); color: var(--ink-soft); padding: 8px; border-radius: 4px; font-size: 14px; }
 
+  /* Help tab + first-run tutorial */
+  #archive-root .help-lead, #archive-root .help-step p, #archive-root .help-acc .help-body, #archive-root .help-note,
+  #archive-root .help-crit div, #archive-root .tut-body, #archive-root .tut-modal h3 { word-break: keep-all; overflow-wrap: break-word; }
+  #archive-root .help-lead { font-size: 17px; line-height: 1.75; color: var(--cream); margin: 0 0 22px; max-width: 820px; }
+  #archive-root .help-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 26px; }
+  #archive-root .help-step { border: 1px solid var(--line-dark); border-radius: 4px; padding: 16px 16px 18px; background: rgba(243,238,223,0.03); }
+  #archive-root .help-step .no { font-family: var(--font-mono); font-size: 13px; color: var(--gold); }
+  #archive-root .help-step h4 { font-family: var(--font-display); font-size: 19px; margin: 6px 0 6px; }
+  #archive-root .help-step p { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--cream-soft); }
+  #archive-root .help-acc { border-top: 1px solid var(--line-dark); }
+  #archive-root .help-acc:last-of-type { border-bottom: 1px solid var(--line-dark); }
+  #archive-root .help-acc summary { cursor: pointer; padding: 14px 4px; font-size: 16.5px; color: var(--cream); list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  #archive-root .help-acc summary::-webkit-details-marker { display: none; }
+  #archive-root .help-acc summary::after { content: '+'; font-family: var(--font-mono); color: var(--gold); font-size: 20px; line-height: 1; }
+  #archive-root .help-acc[open] summary::after { content: '–'; }
+  #archive-root .help-acc .help-body { padding: 0 4px 16px; font-size: 15px; line-height: 1.7; color: var(--cream-soft); }
+  #archive-root .help-acc .help-body b { color: var(--cream); }
+  #archive-root .help-crit { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 22px; margin-bottom: 8px; }
+  #archive-root .help-crit div { font-size: 14.5px; line-height: 1.55; color: var(--cream-soft); }
+  #archive-root .help-crit b { color: var(--gold); font-weight: 600; margin-right: 6px; }
+  #archive-root .help-note { border: 1px dashed var(--line-dark); border-radius: 4px; padding: 14px 16px; font-size: 14.5px; line-height: 1.7; color: var(--cream-soft); margin: 0 0 8px; }
+  #archive-root .help-note b { color: var(--cream); }
+  #archive-root .modal.tut-modal { max-width: 560px; padding: 30px 32px 24px; position: relative; }
+  #archive-root .tut-count { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-soft); letter-spacing: 0.08em; }
+  #archive-root .tut-close { position: absolute; top: 14px; right: 14px; background: transparent; border: none; color: var(--ink-soft); width: 32px; height: 32px; padding: 6px; }
+  #archive-root .tut-close svg { width: 100%; height: 100%; }
+  #archive-root .tut-icon { width: 60px; height: 60px; border-radius: 50%; background: var(--bg); color: var(--gold); display: flex; align-items: center; justify-content: center; margin: 14px 0 14px; }
+  #archive-root .tut-icon svg { width: 30px; height: 30px; }
+  #archive-root .tut-modal h3 { font-size: 25px; margin: 0 0 10px; line-height: 1.35; }
+  #archive-root .tut-body { font-size: 16.5px; line-height: 1.75; color: var(--ink); min-height: 150px; }
+  #archive-root .tut-body p { margin: 0 0 10px; }
+  #archive-root .tut-body ul { margin: 0 0 10px; padding-left: 20px; }
+  #archive-root .tut-body li { margin-bottom: 6px; }
+  #archive-root .tut-body .tut-hint { font-size: 14.5px; color: var(--ink-soft); }
+  #archive-root .tut-dots { display: flex; gap: 8px; justify-content: center; margin: 14px 0 18px; }
+  #archive-root .tut-dots button { width: 9px; height: 9px; padding: 0; border-radius: 50%; border: none; background: var(--paper-line); }
+  #archive-root .tut-dots button.on { background: var(--gold); width: 22px; border-radius: 5px; }
+  #archive-root .tut-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  #archive-root .tut-actions .tut-skip { background: transparent; border: none; color: var(--ink-soft); font-size: 14.5px; padding: 8px 4px; text-decoration: underline; }
+  #archive-root .tut-actions .right { display: flex; gap: 8px; }
+  @media (max-width: 800px) {
+    #archive-root .help-steps { grid-template-columns: repeat(2, 1fr); }
+    #archive-root .help-crit { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    #archive-root .help-steps, #archive-root .help-crit { grid-template-columns: 1fr; }
+    #archive-root .modal.tut-modal { padding: 26px 22px 20px; }
+  }
+
   @media (max-width: 600px) {
     #archive-root .header { flex-wrap: wrap; row-gap: 12px; }
     #archive-root .header .counts { width: 100%; display: flex; gap: 18px; text-align: left; line-height: 1.4; }
@@ -489,7 +574,8 @@
     x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>',
     menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>',
     chevDown: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    opinions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5h16v10H9l-5 4V5z"/><path d="M8 9h8M8 12h5"/></svg>'
+    opinions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5h16v10H9l-5 4V5z"/><path d="M8 9h8M8 12h5"/></svg>',
+    help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M9.4 9.3a2.7 2.7 0 1 1 3.9 2.4c-.9.5-1.3 1-1.3 2" stroke-linecap="round"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/></svg>'
   };
 
   // Left-drawer menu structure. Items with "children" render as a collapsible
@@ -507,10 +593,12 @@
     { key:'vault', label:'자료함', icon: ICONS.archive, children: [
         { id:'approved', label:'승인 자료함' },
         { id:'rejected', label:'반려 자료함' },
+        { id:'share', label:'공유 · 그룹' },
         { id:'compare', label:'상대 비교' },
         { id:'profile', label:'성향 분석' }
     ]},
-    { id:'settings', label:'설정', icon: ICONS.settings }
+    { id:'settings', label:'설정', icon: ICONS.settings },
+    { id:'help', label:'도움말', icon: ICONS.help }
   ];
 
   function uid(){ return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -670,6 +758,9 @@
       issues: state.issues,
       sharing: state.sharing,
       importedProfiles: state.importedProfiles,
+      tutorialDone: state.tutorialDone,
+      sharedLinks: state.sharedLinks,
+      displayName: state.displayName,
       updatedAt: Date.now()
     };
     // keep the published share snapshot in step with what was just saved
@@ -737,7 +828,11 @@
     summaryError: null,
     summaryTargetId: null,
     rejFilter: 'all',
+    tutorialOpen: false, tutorialStep: 0, tutorialDone: false,
     apv: { q: '', field: 'all', sort: 'recent' },
+    sel: {}, selVisible: [], shareModal: null,
+    sharedLinks: [], displayName: '', viewer: null,
+    groups: { list: null, loading: false, busy: false, err: null, msg: null, active: null, items: null, itemsLoading: false, itemsErr: null, filter: 'all', newName: '', joinCode: '' },
     acctEmailMsg: null, acctEmailLoading: false,
     acctPwMsg: null, acctPwLoading: false,
     acctDeleteMsg: null, acctDeleteLoading: false,
@@ -779,7 +874,9 @@
       state.issues = [];
       state.sharing = { code: null, nickname: '', includeTitles: true };
       state.importedProfiles = [];
+      state.sharedLinks = []; state.displayName = '';
       normalizeCriteriaData();
+      state.tutorialDone = false; state.tutorialOpen = true; state.tutorialStep = 0;
       state.loaded = true;
       render();
       persistAppData(); // background save, no need to make the user wait
@@ -798,6 +895,9 @@
       state.issues = data.issues || [];
       state.sharing = data.sharing || { code: null, nickname: '', includeTitles: true };
       state.importedProfiles = data.importedProfiles || [];
+      state.tutorialDone = data.tutorialDone === true;
+      state.sharedLinks = Array.isArray(data.sharedLinks) ? data.sharedLinks : [];
+      state.displayName = typeof data.displayName === 'string' ? data.displayName : '';
     } catch(e){
       state.materials = seedMaterials();
       state.weights = zeroWeights(); state.bias = 0; state.trained = 0;
@@ -805,10 +905,13 @@
       state.issues = [];
       state.sharing = { code: null, nickname: '', includeTitles: true };
       state.importedProfiles = [];
+      state.sharedLinks = []; state.displayName = '';
+      state.tutorialDone = false;
       persistAppData();
     }
 
     normalizeCriteriaData();
+    state.tutorialOpen = !state.tutorialDone; state.tutorialStep = 0;
     state.loaded = true;
     render();
   }
@@ -941,6 +1044,11 @@
 
   function render(){
     var app = document.getElementById('app-mount');
+    if (state.viewer){
+      app.innerHTML = FIREBASE_READY ? viewerHtml() : firebaseErrorHtml();
+      if (FIREBASE_READY) attachViewerHandlers();
+      return;
+    }
     if (!state.authChecked){
       app.innerHTML = loadingHtml('연결 확인 중...');
       return;
@@ -973,12 +1081,16 @@
     else if (state.tab === 'opinions') html += opinionsTabHtml();
     else if (state.tab === 'approved') html += approvedTabHtml(approved);
     else if (state.tab === 'rejected') html += rejectedTabHtml(rejected);
+    else if (state.tab === 'share') html += shareTabHtml();
     else if (state.tab === 'compare') html += compareTabHtml(approved);
     else if (state.tab === 'profile') html += profileTabHtml(approved, rejected, pending);
     else if (state.tab === 'settings') html += settingsTabHtml();
+    else if (state.tab === 'help') html += helpTabHtml();
     html += '</div>';
     if (state.pendingReject) html += reasonModalHtml();
+    if (state.shareModal) html += shareModalHtml();
     if (state.menuOpen) html += menuDrawerHtml();
+    if (state.tutorialOpen) html += tutorialHtml();
     if (state.toast) html += '<div class="toast" id="toast-el">' + escapeHtml(state.toast) + '</div>';
 
     app.innerHTML = html;
@@ -2167,7 +2279,7 @@
     var filterOptions = '<option value="all">전체 이유</option>' + Object.keys(counts).map(function(k){ return '<option value="'+escapeHtml(k)+'" '+(state.rejFilter===k?'selected':'')+'>'+escapeHtml(k)+'</option>'; }).join('');
     var list = rejected.filter(function(m){ return state.rejFilter==='all' || m.rejectReason===state.rejFilter; });
     var items = list.map(function(m){
-      return '<div class="rej-item"><div class="info"><h4>' + escapeHtml(m.title) + '</h4>' +
+      return '<div class="rej-item sel' + (state.sel[m.id] ? ' picked' : '') + '">' + selBoxHtml(m) + '<div class="info"><h4>' + escapeHtml(m.title) + '</h4>' +
         '<span class="tag">' + escapeHtml(m.rejectReason) + '</span>' +
         '<div class="meta2">' + escapeHtml(fieldLabel(m)) + ' · ' + escapeHtml(m.source||'미상') + '</div>' +
         moreLinkHtml(m, 'inline-more') +
@@ -2177,7 +2289,119 @@
     return '<p class="section-title">반려 자료함</p>' +
       '<div class="rej-chips">' + chips + '</div>' +
       '<div class="field" style="max-width:220px;"><select id="rej-filter">' + filterOptions + '</select></div>' +
+      selBarHtml(list.map(function(m){ return m.id; })) +
       items;
+  }
+
+  // ---- Help tab + first-run tutorial ----
+  var TUTORIAL_STEPS = [
+    { icon: 'home', title: '자료평가서고에 오신 걸 환영해요',
+      body: '<p>탐구 보고서나 수행평가에 쓸 자료를 <b>모으고</b>, 그 자료가 <b>믿을 만한지 평가</b>하는 걸 도와주는 프로그램이에요.</p>' +
+            '<p>과제를 대신 써 주는 도구가 아니에요. 자료를 찾고 판단하는 연습과 정리를 돕는 도구예요.</p>' +
+            '<p class="tut-hint">1분이면 사용법을 다 볼 수 있어요.</p>' },
+    { icon: 'add', title: '1. 자료를 모아요',
+      body: '<p>왼쪽 위 <b>☰ 메뉴 → 자료</b>에서 평가할 자료를 쌓아요.</p>' +
+            '<ul><li><b>자료 추가</b>: 자료 하나를 직접 등록해요.</li>' +
+            '<li><b>대량 추가</b>: URL 목록을 붙여넣거나, 키워드로 웹에서 찾아와요.</li>' +
+            '<li><b>의견 수집</b>: 사회 이슈에 대한 여러 의견을 모아 입장별로 정리해 줘요.</li></ul>' },
+    { icon: 'swipe', title: '2. 카드로 평가해요',
+      body: '<p><b>카드 평가</b>에서 자료를 한 장씩 보고 판단해요.</p>' +
+            '<ul><li><b>오른쪽</b>으로 넘기면 <b>적절</b>, <b>왼쪽</b>은 <b>반려</b>예요. 반려할 땐 이유를 골라요.</li>' +
+            '<li>"AI 요약 보기"와 "원문 보기"로 내용을 확인하고 정해요.</li></ul>' +
+            '<p class="tut-hint">적절·반려 기록은 각각 승인 자료함, 반려 자료함에 쌓여요.</p>' },
+    { icon: 'profile', title: '3. 점수는 참고용이에요',
+      body: '<p>카드의 9가지 점수(신뢰성, 최신성, 정보 충실도 등)는 AI가 제목과 출처, 요약만 보고 <b>추정한 값</b>이에요.</p>' +
+            '<p>틀릴 수 있으니 보고서에 쓸 자료는 꼭 <b>원문을 직접 열어 확인</b>하고, 출처를 밝혀서 인용하세요.</p>' },
+    { icon: 'archive', title: '4. 내 기준을 배워요',
+      body: '<p>카드를 평가할수록 <b>성향 분석</b>에 "내가 중요하게 여기는 기준"이 쌓여요.</p>' +
+            '<ul><li><b>분별 수집</b>: 내 기준에 맞는 자료만 AI가 골라서 모아 줘요.</li>' +
+            '<li><b>성향 공유</b>: 공유 코드로 모둠원과 같은 기준을 쓸 수 있어요.</li></ul>' +
+            '<p class="tut-hint">처음에는 점수 차이가 작을 수 있어요. 카드를 여러 장 평가해 보세요.</p>' },
+    { icon: 'help', title: '준비 끝! 시작해 볼까요?',
+      body: '<p>카드 평가나 자료 추가부터 시작해 보세요.</p>' +
+            '<p>막히면 언제든 <b>☰ 메뉴 → 도움말</b>에서 기능 설명과 자주 묻는 질문을 볼 수 있어요. 이 안내도 도움말에서 다시 볼 수 있어요.</p>' }
+  ];
+
+  function tutorialHtml(){
+    var i = Math.max(0, Math.min(TUTORIAL_STEPS.length - 1, state.tutorialStep));
+    var st = TUTORIAL_STEPS[i];
+    var last = i === TUTORIAL_STEPS.length - 1;
+    var dots = TUTORIAL_STEPS.map(function(x, k){
+      return '<button type="button" class="' + (k === i ? 'on' : '') + '" data-tut-step="' + k + '" aria-label="' + (k + 1) + '단계로 이동"></button>';
+    }).join('');
+    return '<div class="modal-overlay" id="tut-overlay" style="z-index:60;"><div class="modal tut-modal" role="dialog" aria-modal="true">' +
+      '<button type="button" class="tut-close" id="tut-skip-x" aria-label="닫기">' + ICONS.x + '</button>' +
+      '<div class="tut-count">' + (i + 1) + ' / ' + TUTORIAL_STEPS.length + '</div>' +
+      '<div class="tut-icon">' + ICONS[st.icon] + '</div>' +
+      '<h3>' + st.title + '</h3>' +
+      '<div class="tut-body">' + st.body + '</div>' +
+      '<div class="tut-dots">' + dots + '</div>' +
+      '<div class="tut-actions">' +
+        (last ? '<span></span>' : '<button type="button" class="tut-skip" id="tut-skip">건너뛰기</button>') +
+        '<div class="right">' +
+          (i > 0 ? '<button type="button" class="btn ghost small" id="tut-prev" style="color:var(--ink);border-color:rgba(32,40,31,0.35);">이전</button>' : '') +
+          '<button type="button" class="btn small" id="tut-next">' + (last ? '시작하기' : '다음') + '</button>' +
+        '</div>' +
+      '</div></div></div>';
+  }
+
+  function helpTabHtml(){
+    var steps = [
+      ['1', '자료 모으기', '자료 추가, 대량 추가, 의견 수집으로 평가할 자료를 쌓아요.'],
+      ['2', '카드로 평가하기', '카드 평가에서 오른쪽(적절)·왼쪽(반려)으로 넘기며 판단해요.'],
+      ['3', '내 기준 확인하기', '성향 분석에서 내가 중요하게 여기는 기준과 반려 이유를 봐요.'],
+      ['4', '골라서 더 모으기', '분별 수집으로 내 기준에 맞는 자료만 AI가 골라 모아 줘요.']
+    ];
+    var stepsHtml = steps.map(function(x){
+      return '<div class="help-step"><span class="no">STEP ' + x[0] + '</span><h4>' + x[1] + '</h4><p>' + x[2] + '</p></div>';
+    }).join('');
+
+    var guide = [
+      ['메인화면', '학습 현황, 내가 중요하게 여기는 기준, 지금 눈여겨볼 대기 자료를 한눈에 봐요. "내 성향에 맞는 자료 찾기"로 바로 수집할 수도 있어요.'],
+      ['카드 평가', '자료를 카드 한 장씩 보고 <b>오른쪽으로 넘기면 적절</b>, <b>왼쪽으로 넘기면 반려</b>예요. 반려하면 이유를 고르고, 이 기록이 내 기준을 학습하는 데 쓰여요. "AI 요약 보기"는 내용을 추정한 요약이고, "원문 보기"로 직접 확인할 수 있어요.'],
+      ['자료 추가', '제목, 출처, URL을 입력해 자료 하나를 등록해요. 9가지 점수는 AI가 추정하게 하거나 직접 입력할 수 있어요.'],
+      ['대량 추가', '<b>URL 목록으로 추가</b>(여러 개를 붙여넣기), <b>샘플 자동 생성</b>(연습용), <b>무분별 수집</b>(키워드로 웹에서 찾은 자료를 그대로 가져오기), <b>분별 수집</b>(내 성향 또는 공유받은 성향에 맞는 자료만 AI가 걸러서 가져오기)가 있어요.'],
+      ['의견 수집', '사회 이슈를 등록하면 웹에서 의견을 찾아오거나 직접 입력할 수 있어요. AI가 비슷한 입장끼리 묶고 비율을 막대로 보여줘요. 찬반이 나뉘는 주제의 탐구나 토론 준비에 유용해요.'],
+      ['승인 자료함', '적절로 넘긴 자료를 모아 두는 곳이에요. 검색, 분야 필터, 정렬, 메모, "대기로 되돌리기"를 쓸 수 있어요.'],
+      ['반려 자료함', '반려한 자료와 그 이유를 볼 수 있어요. 이유별로 거르거나, 마음이 바뀌면 되돌릴 수 있어요.'],
+      ['공유 · 그룹', '승인·반려 자료함에서 자료를 체크하면 <b>공유 링크</b>를 만들거나 <b>그룹</b>에 넣을 수 있어요. 링크는 로그인 없이 읽기 전용으로 열려요. 그룹은 학급·동아리처럼 코드를 아는 사람끼리 쓰는 공간이고, 친구가 넣은 자료는 "내 서고에 담기"로 내 대기 목록에 가져와 직접 평가할 수 있어요.'],
+      ['상대 비교', '승인한 자료 두 개를 기준별로 맞대어 비교해요. 비교할수록 점수가 더 정교해져요.'],
+      ['성향 분석', '내가 중요하게 여기는 기준과 반려 이유 분포를 볼 수 있어요. 맨 아래 <b>내 성향 공유하기</b>에서 공유 코드를 만들면, 다른 사람이 분별 수집에서 내 기준을 쓸 수 있어요. 모둠 과제에서 선별 기준을 맞출 때 쓸 수 있어요.'],
+      ['설정', 'AI 모델 선택과 연결 테스트, 데이터 초기화, 계정 관리를 할 수 있어요.']
+    ];
+    var guideHtml = guide.map(function(g){
+      return '<details class="help-acc"><summary>' + g[0] + '</summary><div class="help-body">' + g[1] + '</div></details>';
+    }).join('');
+
+    var critDesc = {
+      trust: '출처가 믿을 만한가', appropriateness: '내 주제와 관련이 있는가', recency: '얼마나 최근 정보인가',
+      objectivity: '근거와 데이터 중심인가', expertise: '전문가·기관이 쓴 내용인가', depth: '정보가 충분하고 깊이 있는가',
+      clarity: '내 수준에서 이해되는가', lowBias: '한쪽으로 치우치지 않았는가', interest: '흥미로운 주제인가'
+    };
+    var critHtml = '<div class="help-crit">' + CRITERIA.map(function(c){
+      return '<div><b>' + c.label + '</b>' + (critDesc[c.key] || '') + '</div>';
+    }).join('') + '</div>';
+
+    var faq = [
+      ['카드 평가에 카드가 없다고 나와요', '평가할 자료가 없는 상태예요. <b>자료 추가</b>나 <b>대량 추가</b>에서 자료를 먼저 등록해 주세요.'],
+      ['성향 분석이 비어 있어요', '카드를 평가해야 내 기준이 쌓여요. 처음에는 점수 차이가 작을 수 있으니 카드를 여러 장(10장 이상) 평가해 보세요.'],
+      ['수집이나 AI 점수 매기기가 안 돼요', '하루에 쓸 수 있는 AI·검색 횟수에는 한도가 있어요. 한도 오류라면 시간이 지난 뒤 다시 하거나, <b>설정</b>에서 다른 AI 모델을 골라 "연결 테스트"를 해 보세요.'],
+      ['내 자료를 다른 사람이 볼 수 있나요?', '내가 직접 공유하기 전에는 아니에요. 자료와 평가 기록은 내 계정에만 저장돼요. 공유 링크나 그룹에 넣은 자료, 성향 공유로 내보낸 내용만 상대가 볼 수 있고, 이메일은 어디에도 공유되지 않아요. 공유 링크는 "공유 · 그룹" 메뉴에서 언제든 중단할 수 있어요.']
+    ];
+    var faqHtml = faq.map(function(g){
+      return '<details class="help-acc"><summary>' + g[0] + '</summary><div class="help-body">' + g[1] + '</div></details>';
+    }).join('');
+
+    return '<p class="section-title">도움말</p>' +
+      '<p class="help-lead"><b>자료평가서고</b>는 탐구 보고서나 수행평가에 쓸 자료를 모으고, 그 자료가 믿을 만한지 판단하는 걸 도와주는 프로그램이에요. ' +
+        '과제를 대신 써 주는 도구가 아니라, 자료를 찾고 평가하는 연습과 정리를 돕는 도구예요. ' +
+        '카드를 넘기며 평가하다 보면 "내가 중요하게 보는 기준"을 프로그램이 배워서, 비슷한 자료를 골라 줘요.</p>' +
+      '<div style="margin-bottom:26px;"><button class="btn small" id="help-replay">처음 안내(튜토리얼) 다시 보기</button></div>' +
+      '<p class="section-title">기본 사용 순서</p><div class="help-steps">' + stepsHtml + '</div>' +
+      '<p class="section-title">메뉴별 기능</p><div style="margin-bottom:28px;">' + guideHtml + '</div>' +
+      '<p class="section-title">9가지 평가 기준</p>' + critHtml +
+      '<p class="help-note" style="margin-top:14px;margin-bottom:28px;"><b>점수는 참고용이에요.</b> AI가 제목·출처·요약만 보고 추정한 값이라 틀릴 수 있어요. 보고서에 쓸 자료는 꼭 원문을 직접 확인하고, 출처를 밝혀서 인용하세요.</p>' +
+      '<p class="section-title">자주 묻는 질문</p><div style="margin-bottom:20px;">' + faqHtml + '</div>';
   }
 
   // ---- Approved vault ----
@@ -2222,7 +2446,7 @@
         return '<div class="apv-bar">' + escapeHtml(c.label) + ' ' + v + '<div class="track"><i style="width:' + Math.max(0, Math.min(100, v)) + '%"></i></div></div>';
       }).join('');
       var decided = fmtDecided(m);
-      return '<div class="apv-item"><div class="apv-top"><div class="info">' +
+      return '<div class="apv-item sel' + (state.sel[m.id] ? ' picked' : '') + '">' + selBoxHtml(m) + '<div class="apv-top"><div class="info">' +
           '<h4>' + escapeHtml(m.title) + '</h4>' +
           '<span class="tag">' + escapeHtml(fieldLabel(m)) + '</span>' +
           '<div class="meta2">' + escapeHtml(m.source||'미상') + (decided ? ' · ' + decided : '') + '</div>' +
@@ -2246,7 +2470,767 @@
         '<div class="field"><select id="apv-sort">' + sortOptions + '</select></div>' +
       '</div>' +
       '<div class="apv-count">' + list.length + '개 표시 (전체 ' + approved.length + '개)</div>' +
+      selBarHtml(list.map(function(m){ return m.id; })) +
       items;
+  }
+
+  // ---- 공유 · 스크랩 · 그룹 ----------------------------------------------
+  // 1) 공유 링크: 선택한 자료의 스냅샷을 shared_collections/{코드}에 저장하고,
+  //    ?s=코드 주소로 로그인 없이 읽기 전용 페이지를 보여준다.
+  // 2) 그룹: groups/{코드} (+ items 하위 컬렉션). 코드를 아는 로그인 사용자가 참여한다.
+  // 모든 공유 문서에는 이메일을 넣지 않는다 (uid와 사용자가 정한 이름만).
+  var MAX_SHARE_ITEMS = 100;
+  var MAX_GROUP_MEMBERS = 60;
+
+  function safeHttpUrl(u){
+    u = String(u || '').trim();
+    return /^https?:\/\/[^\s"'<>]+$/i.test(u) ? u.slice(0, 500) : null;
+  }
+  function clamp100(v){
+    v = Number(v);
+    if (!isFinite(v)) return 50;
+    return Math.max(0, Math.min(100, Math.round(v)));
+  }
+  function avgOfScores(sc){
+    var t = 0; CRITERIA.forEach(function(c){ t += clamp100(sc && sc[c.key]); });
+    return Math.round(t / CRITERIA.length);
+  }
+  function fmtDate(ts){
+    if (!ts) return '';
+    var d = new Date(ts);
+    return (d.getMonth() + 1) + '월 ' + d.getDate() + '일';
+  }
+  function myName(){ return (state.displayName || '').trim().slice(0, 30) || '익명'; }
+  function findMaterial(id){ return state.materials.filter(function(m){ return m.id === id; })[0] || null; }
+  function shareRulesMsg(err, what){
+    if (err && err.code === 'permission-denied') return what + '에 필요한 Firestore 보안 규칙이 아직 없거나, 권한이 없어요. 안내된 규칙을 추가한 뒤 다시 시도해주세요.';
+    return (err && err.message) ? err.message : '알 수 없는 오류';
+  }
+  function shareLinkUrl(code){
+    return location.href.split('#')[0].split('?')[0] + '?s=' + code;
+  }
+  function copyText(text, okMsg){
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ showToast(okMsg); }, function(){ showToast('복사하지 못했어요. 직접 선택해서 복사해주세요.'); });
+    } else {
+      showToast('복사하지 못했어요. 직접 선택해서 복사해주세요.');
+    }
+  }
+
+  // What leaves the app for one material (no email, no internal ids, no raw page text).
+  function itemSnapshot(m, withNote){
+    var o = {
+      title: String(m.title || '').slice(0, 200),
+      source: String(m.source || '').slice(0, 120),
+      url: safeHttpUrl(m.url),
+      field: String(m.field || '').slice(0, 40),
+      subfield: m.subfield ? String(m.subfield).slice(0, 40) : null,
+      summary: m.summary ? String(m.summary).slice(0, 600) : null,
+      scores: {},
+      status: m.status === 'rejected' ? 'rejected' : 'approved',
+      rejectReason: m.status === 'rejected' ? String(m.rejectReason || '기타').slice(0, 40) : null,
+      decidedAt: m.decidedAt || null
+    };
+    CRITERIA.forEach(function(c){ o.scores[c.key] = clamp100(m.scores && m.scores[c.key]); });
+    if (withNote && m.note) o.note = String(m.note).slice(0, 500);
+    return o;
+  }
+
+  // Anything read back from a shared doc is untrusted: coerce every field.
+  function cleanSharedItem(raw){
+    raw = raw || {};
+    var sc = {};
+    CRITERIA.forEach(function(c){ sc[c.key] = clamp100(raw.scores && raw.scores[c.key]); });
+    return {
+      title: String(raw.title || '').slice(0, 200) || '(제목 없음)',
+      source: String(raw.source || '').slice(0, 120),
+      url: safeHttpUrl(raw.url),
+      field: String(raw.field || '').slice(0, 40),
+      subfield: raw.subfield ? String(raw.subfield).slice(0, 40) : null,
+      summary: raw.summary ? String(raw.summary).slice(0, 600) : '',
+      scores: sc,
+      status: raw.status === 'rejected' ? 'rejected' : 'approved',
+      rejectReason: raw.rejectReason ? String(raw.rejectReason).slice(0, 40) : '',
+      note: raw.note ? String(raw.note).slice(0, 500) : '',
+      decidedAt: Number(raw.decidedAt) || 0
+    };
+  }
+
+  // ---- selection UI inside the two vaults ----
+  function selectedMaterials(){
+    var want = state.tab === 'approved' ? 'approved' : 'rejected';
+    return state.materials.filter(function(m){ return state.sel[m.id] && m.status === want; });
+  }
+  function selBoxHtml(m){
+    return '<label class="sel-box" title="공유할 자료로 선택"><input type="checkbox" data-sel="' + m.id + '" ' + (state.sel[m.id] ? 'checked' : '') + ' aria-label="이 자료 선택"></label>';
+  }
+  function selBarHtml(visibleIds){
+    state.selVisible = visibleIds;
+    var n = selectedMaterials().length;
+    var allOn = visibleIds.length > 0 && visibleIds.every(function(id){ return state.sel[id]; });
+    var dis = n === 0 ? 'disabled' : '';
+    return '<div class="sel-bar">' +
+      '<label><input type="checkbox" id="sel-all" ' + (allOn ? 'checked' : '') + '> 표시된 자료 모두 선택</label>' +
+      '<span class="cnt">' + n + '개 선택' + (n > MAX_SHARE_ITEMS ? ' (한 번에 최대 ' + MAX_SHARE_ITEMS + '개)' : '') + '</span>' +
+      '<span class="grow"></span>' +
+      '<button type="button" class="btn small" data-share-open="link" ' + dis + '>공유 링크 만들기</button>' +
+      '<button type="button" class="btn ghost small" data-share-open="group" ' + dis + '>그룹에 넣기</button>' +
+    '</div>';
+  }
+
+  // ---- one shared item card (used by the public viewer and by group pages) ----
+  function sharedItemHtml(it, metaExtra, actionsHtml){
+    var bars = CRITERIA.map(function(c){
+      var v = it.scores[c.key];
+      return '<div class="apv-bar">' + escapeHtml(c.label) + ' ' + v + '<div class="track"><i style="width:' + v + '%"></i></div></div>';
+    }).join('');
+    var pill = it.status === 'rejected'
+      ? '<span class="pill no">반려' + (it.rejectReason ? ' · ' + escapeHtml(it.rejectReason) : '') + '</span>'
+      : '<span class="pill ok">적절</span>';
+    var title = it.url
+      ? '<a href="' + escapeHtml(it.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(it.title) + '</a>'
+      : escapeHtml(it.title);
+    var field = it.field ? '<span class="tag">' + escapeHtml(it.field + (it.subfield ? ' · ' + it.subfield : '')) + '</span> ' : '';
+    return '<div class="apv-item">' +
+      '<div class="apv-top"><div class="info">' +
+        '<h4>' + title + '</h4>' + field + pill +
+        '<div class="meta2">' + escapeHtml(it.source || '출처 미상') + (metaExtra ? ' · ' + metaExtra : '') + '</div>' +
+      '</div><div class="apv-badges"><div class="apv-badge"><div class="n">' + avgOfScores(it.scores) + '</div><div class="l">평균 점수</div></div></div></div>' +
+      (it.summary ? '<p class="sh-sum"><b>✦ AI 요약(추정)</b> ' + escapeHtml(it.summary) + '</p>' : '') +
+      '<div class="apv-bars">' + bars + '</div>' +
+      (it.note ? '<p class="sh-note"><b>메모</b> ' + escapeHtml(it.note) + '</p>' : '') +
+      (actionsHtml ? '<div class="apv-actions">' + actionsHtml + '</div>' : '') +
+    '</div>';
+  }
+
+  function statusFilterHtml(id, cur, items){
+    var a = 0, r = 0;
+    items.forEach(function(x){ if (x.status === 'rejected') r++; else a++; });
+    return '<div class="field" style="max-width:220px;"><select id="' + id + '">' +
+      '<option value="all"' + (cur === 'all' ? ' selected' : '') + '>전체 (' + items.length + ')</option>' +
+      '<option value="approved"' + (cur === 'approved' ? ' selected' : '') + '>적절 (' + a + ')</option>' +
+      '<option value="rejected"' + (cur === 'rejected' ? ' selected' : '') + '>반려 (' + r + ')</option>' +
+    '</select></div>';
+  }
+
+  // ---- 공유 링크: public read-only viewer (no login) ----
+  function loadViewer(){
+    var v = state.viewer;
+    fbDb.collection('shared_collections').doc(v.code).get().then(function(snap){
+      if (!snap.exists) throw new Error('공유가 중단되었거나 잘못된 링크예요.');
+      var d = snap.data() || {};
+      v.data = {
+        title: String(d.title || '공유된 자료 모음').slice(0, 80),
+        ownerName: String(d.ownerName || '').slice(0, 30),
+        createdAt: Number(d.createdAt) || 0,
+        items: (Array.isArray(d.items) ? d.items : []).slice(0, 200).map(cleanSharedItem)
+      };
+      v.loading = false;
+      try { document.title = v.data.title + ' · 자료평가서고'; } catch(e){}
+      render();
+    }).catch(function(err){
+      v.loading = false;
+      v.err = (err && err.code === 'permission-denied')
+        ? '이 링크를 열 수 있는 권한 설정이 아직 안 되어 있어요. 공유한 사람에게 알려주세요.'
+        : ((err && err.message) ? err.message : '불러오지 못했어요.');
+      render();
+    });
+  }
+
+  function viewerHtml(){
+    var v = state.viewer;
+    var home = location.href.split('#')[0].split('?')[0];
+    var html = '<div class="viewer-brand">자료 평가 서고 · 공유된 자료 모음</div>';
+    if (v.loading) return html + loadingHtml('불러오는 중...');
+    if (v.err) {
+      return html + '<div class="empty" style="height:auto;padding:36px 20px;"><h3>자료를 볼 수 없어요</h3><p>' + escapeHtml(v.err) + '</p></div>' +
+        '<p style="text-align:center;margin-top:18px;"><a class="btn small btn-link" href="' + escapeHtml(home) + '">자료평가서고 열기</a></p>';
+    }
+    var d = v.data;
+    var a = 0, r = 0;
+    d.items.forEach(function(x){ if (x.status === 'rejected') r++; else a++; });
+    var list = d.items.filter(function(x){ return v.filter === 'all' || x.status === v.filter; });
+    var items = list.map(function(it){ return sharedItemHtml(it, '', ''); }).join('');
+    if (!items) items = '<div class="empty" style="min-height:140px;"><p>표시할 자료가 없어요.</p></div>';
+    html += '<h1 class="viewer-title">' + escapeHtml(d.title) + '</h1>' +
+      '<div class="viewer-meta">' + (d.ownerName ? escapeHtml(d.ownerName) + ' 님이 공유 · ' : '') + (d.createdAt ? fmtDate(d.createdAt) + ' · ' : '') + '적절 ' + a + '개 · 반려 ' + r + '개</div>' +
+      '<p class="help-note"><b>읽기 전용 페이지예요.</b> 공유한 사람이 카드 평가로 고른 자료의 모음이고, 점수는 AI가 제목·출처·요약만 보고 추정한 값이라 틀릴 수 있어요. 보고서에 쓰기 전에 원문을 직접 확인하고 출처를 밝혀서 인용하세요.</p>' +
+      statusFilterHtml('v-filter', v.filter, d.items) + items +
+      '<p style="text-align:center;margin:28px 0 0;"><a class="btn ghost small btn-link" href="' + escapeHtml(home) + '">나도 자료평가서고 써보기</a></p>';
+    return html;
+  }
+
+  function attachViewerHandlers(){
+    var f = document.getElementById('v-filter');
+    if (f) f.addEventListener('change', function(){ state.viewer.filter = f.value; render(); });
+  }
+
+  // ---- 공유 모달 (공유 링크 / 그룹에 넣기) ----
+  function openShareModal(kind){
+    var mats = selectedMaterials();
+    if (!mats.length) return;
+    if (mats.length > MAX_SHARE_ITEMS){ showToast('한 번에 최대 ' + MAX_SHARE_ITEMS + '개까지 공유할 수 있어요. 선택을 줄여주세요.'); return; }
+    var d = new Date();
+    state.shareModal = {
+      kind: kind, ids: mats.map(function(m){ return m.id; }),
+      withNote: false,
+      title: (state.tab === 'approved' ? '승인 자료 모음' : '반려 자료 모음') + ' (' + (d.getMonth() + 1) + '/' + d.getDate() + ')',
+      name: state.displayName || '',
+      pick: null, newGroup: '',
+      busy: false, msg: null, result: null
+    };
+    render();
+    if (kind === 'group') loadGroups(false);
+  }
+
+  function shareModalHtml(){
+    var sm = state.shareModal;
+    var mats = sm.ids.map(findMaterial).filter(Boolean);
+    var a = 0, r = 0, notes = 0;
+    mats.forEach(function(m){ if (m.status === 'rejected') r++; else a++; if (m.note) notes++; });
+    var counts = '적절 ' + a + '개' + (r ? ' · 반려 ' + r + '개' : '');
+    var html = '<div class="modal-overlay" id="sm-overlay"><div class="modal share-modal" role="dialog" aria-modal="true">';
+    var msgHtml = sm.msg ? '<p class="acct-msg ' + sm.msg.type + '" style="margin:10px 0 0;">' + escapeHtml(sm.msg.text) + '</p>' : '';
+
+    if (sm.kind === 'link'){
+      html += '<h3>공유 링크 만들기</h3>';
+      if (sm.result){
+        html += '<div class="sub2">링크를 만들었어요. 이 주소를 아는 사람은 누구나 <b>로그인 없이</b> 읽기 전용으로 볼 수 있어요.</div>' +
+          '<div class="field"><label>공유 링크</label><input type="text" id="sm-url" readonly value="' + escapeHtml(sm.result) + '"></div>' +
+          '<div class="sm-actions"><button type="button" class="btn small" id="sm-copy">링크 복사</button>' +
+          '<a class="btn ghost small btn-link" href="' + escapeHtml(sm.result) + '" target="_blank" rel="noopener noreferrer">열어 보기</a>' +
+          '<button type="button" class="btn ghost small" id="sm-close">닫기</button></div>' +
+          '<p class="sm-hint">링크는 만든 시점의 스냅샷이에요. 이후에 자료를 바꿔도 링크 내용은 그대로예요. 그만 공유하고 싶으면 <b>메뉴 → 공유 · 그룹</b>에서 링크를 중단할 수 있어요.</p>';
+        return html + '</div></div>';
+      }
+      html += '<div class="sub2">선택한 ' + mats.length + '개(' + counts + ')를 읽기 전용 페이지로 공유해요.</div>' +
+        '<div class="field"><label>모음 제목</label><input type="text" id="sm-title" maxlength="80" value="' + escapeHtml(sm.title) + '"></div>' +
+        '<div class="field"><label>보일 내 이름 (선택)</label><input type="text" id="sm-name" maxlength="30" placeholder="예: 1학년 3반 유선웅" value="' + escapeHtml(sm.name) + '"></div>' +
+        (notes ? '<div class="toggle-row"><input type="checkbox" id="sm-note" ' + (sm.withNote ? 'checked' : '') + '><label for="sm-note" style="margin:0;">내가 쓴 메모(' + notes + '개)도 함께 보이기</label></div>' : '') +
+        '<p class="sm-hint">공유되는 것: 제목, 출처, 원문 링크, AI 요약, 9가지 점수' + (r ? ', 반려 이유' : '') + '. 이메일과 계정 정보는 공유되지 않아요.</p>' +
+        msgHtml +
+        '<div class="sm-actions"><button type="button" class="btn small" id="sm-go" ' + (sm.busy ? 'disabled' : '') + '>' + (sm.busy ? '만드는 중...' : '링크 만들기') + '</button>' +
+        '<button type="button" class="btn ghost small" id="sm-cancel" ' + (sm.busy ? 'disabled' : '') + '>취소</button></div>';
+      return html + '</div></div>';
+    }
+
+    // kind === 'group'
+    var g = state.groups;
+    html += '<h3>그룹에 넣기</h3>';
+    if (sm.result){
+      html += '<div class="sub2">' + escapeHtml(sm.result.text) + '</div>' +
+        '<div class="sm-actions"><button type="button" class="btn small" id="sm-viewgroup">그룹 보기</button>' +
+        '<button type="button" class="btn ghost small" id="sm-close">닫기</button></div>';
+      return html + '</div></div>';
+    }
+    html += '<div class="sub2">선택한 ' + mats.length + '개(' + counts + ')를 학급·동아리 그룹에 넣어요. 그룹 사람들은 이 자료를 보고 자기 서고에 담을 수 있어요.</div>';
+    if (g.loading && !g.list){
+      html += '<p class="sm-hint">그룹을 불러오는 중...</p>';
+    } else {
+      var list = g.list || [];
+      if (g.err) html += '<p class="acct-msg err" style="margin:0 0 10px;">' + escapeHtml(g.err) + '</p>';
+      html += '<div class="field"><label>어느 그룹에 넣을까요?</label><div class="sm-picks">';
+      list.forEach(function(x){
+        html += '<label class="sm-pick"><input type="radio" name="sm-group" value="' + escapeHtml(x.code) + '" ' + (sm.pick === x.code ? 'checked' : '') + '> ' + escapeHtml(x.name) + ' <span>' + (x.memberUids || []).length + '명</span></label>';
+      });
+      html += '<label class="sm-pick"><input type="radio" name="sm-group" value="__new" ' + (sm.pick === '__new' ? 'checked' : '') + '> + 새 그룹 만들기</label></div></div>';
+      if (sm.pick === '__new'){
+        html += '<div class="field"><label>새 그룹 이름</label><input type="text" id="sm-newgroup" maxlength="40" placeholder="예: 1학년 3반 탐구반" value="' + escapeHtml(sm.newGroup) + '"></div>';
+      }
+      html += '<div class="field"><label>그룹에서 보일 내 이름</label><input type="text" id="sm-name" maxlength="30" placeholder="예: 유선웅" value="' + escapeHtml(sm.name) + '"></div>' +
+        (notes ? '<div class="toggle-row"><input type="checkbox" id="sm-note" ' + (sm.withNote ? 'checked' : '') + '><label for="sm-note" style="margin:0;">내가 쓴 메모(' + notes + '개)도 함께 보이기</label></div>' : '') +
+        '<p class="sm-hint">그룹에 넣은 자료는 그룹 멤버 모두가 볼 수 있어요. 이메일은 공유되지 않고, 내가 넣은 자료는 언제든 내가 지울 수 있어요.</p>';
+    }
+    html += msgHtml +
+      '<div class="sm-actions"><button type="button" class="btn small" id="sm-go" ' + ((sm.busy || !sm.pick) ? 'disabled' : '') + '>' + (sm.busy ? '넣는 중...' : '그룹에 넣기') + '</button>' +
+      '<button type="button" class="btn ghost small" id="sm-cancel" ' + (sm.busy ? 'disabled' : '') + '>취소</button></div>';
+    return html + '</div></div>';
+  }
+
+  function publishLink(){
+    var sm = state.shareModal;
+    if (!sm || sm.busy) return;
+    var mats = sm.ids.map(findMaterial).filter(Boolean);
+    if (!mats.length){ sm.msg = { type: 'err', text: '선택한 자료를 찾지 못했어요.' }; render(); return; }
+    var name = (sm.name || '').trim().slice(0, 30);
+    var code = genShareCode();
+    var doc = {
+      ownerUid: state.user.uid,
+      title: ((sm.title || '').trim() || '공유된 자료 모음').slice(0, 80),
+      ownerName: name,
+      createdAt: Date.now(),
+      items: mats.map(function(m){ return itemSnapshot(m, sm.withNote); })
+    };
+    sm.busy = true; sm.msg = null; render();
+    fbDb.collection('shared_collections').doc(code).set(doc).then(function(){
+      var a = 0; doc.items.forEach(function(x){ if (x.status === 'approved') a++; });
+      state.sharedLinks.unshift({ code: code, title: doc.title, count: doc.items.length, approved: a, rejected: doc.items.length - a, createdAt: doc.createdAt });
+      if (name) state.displayName = name;
+      persistAppData();
+      sm.busy = false; sm.result = shareLinkUrl(code);
+      state.sel = {};
+      render();
+    }).catch(function(err){
+      sm.busy = false; sm.msg = { type: 'err', text: shareRulesMsg(err, '공유 링크') };
+      render();
+    });
+  }
+
+  function addSelectedToGroup(){
+    var sm = state.shareModal;
+    if (!sm || sm.busy || !sm.pick) return;
+    var mats = sm.ids.map(findMaterial).filter(Boolean);
+    if (!mats.length){ sm.msg = { type: 'err', text: '선택한 자료를 찾지 못했어요.' }; render(); return; }
+    var name = (sm.name || '').trim().slice(0, 30);
+    if (name) state.displayName = name;
+    var who = myName();
+    sm.busy = true; sm.msg = null; render();
+    var ready;
+    if (sm.pick === '__new'){
+      var gname = (sm.newGroup || '').trim();
+      if (!gname){ sm.busy = false; sm.msg = { type: 'err', text: '새 그룹 이름을 입력해주세요.' }; render(); return; }
+      ready = createGroup(gname, who);
+    } else {
+      ready = Promise.resolve(groupByCode(sm.pick));
+    }
+    var target;
+    ready.then(function(grp){
+      if (!grp) throw new Error('그룹을 찾지 못했어요. 목록을 새로 불러와주세요.');
+      target = grp;
+      return addItemsToGroup(grp.code, mats, sm.withNote, who);
+    }).then(function(){
+      persistAppData();
+      sm.busy = false;
+      sm.result = { code: target.code, text: '"' + target.name + '" 그룹에 ' + mats.length + '개를 넣었어요.' };
+      if (state.groups.active === target.code) state.groups.items = null;
+      state.sel = {};
+      render();
+    }).catch(function(err){
+      sm.busy = false; sm.msg = { type: 'err', text: shareRulesMsg(err, '그룹') };
+      render();
+    });
+  }
+
+  // ---- 그룹 ----
+  function groupByCode(code){
+    return (state.groups.list || []).filter(function(g){ return g.code === code; })[0] || null;
+  }
+
+  function loadGroups(force){
+    var g = state.groups;
+    if (g.loading) return;
+    if (g.list && !force) return;
+    g.loading = true; g.err = null; render();
+    fbDb.collection('groups').where('memberUids', 'array-contains', state.user.uid).get().then(function(snap){
+      var list = [];
+      snap.forEach(function(d){ var x = d.data(); x.code = d.id; list.push(x); });
+      list.sort(function(a, b){ return (b.createdAt || 0) - (a.createdAt || 0); });
+      g.list = list; g.loading = false; render();
+    }).catch(function(err){
+      g.loading = false; g.list = g.list || [];
+      g.err = shareRulesMsg(err, '그룹');
+      render();
+    });
+  }
+
+  function createGroup(name, who){
+    var uid0 = state.user.uid;
+    var code = genShareCode();
+    var names = {}; names[uid0] = who;
+    var data = { name: name.slice(0, 40), ownerUid: uid0, ownerName: who, memberUids: [uid0], memberNames: names, createdAt: Date.now() };
+    return fbDb.collection('groups').doc(code).set(data).then(function(){
+      data.code = code;
+      state.groups.list = [data].concat(state.groups.list || []);
+      return data;
+    });
+  }
+
+  function joinGroup(rawCode){
+    var code = normShareCode(rawCode);
+    if (code.length !== 12) return Promise.reject(new Error('참여 코드는 12자리예요. 다시 확인해주세요.'));
+    var ref = fbDb.collection('groups').doc(code);
+    var uid0 = state.user.uid;
+    return ref.get().then(function(snap){
+      if (!snap.exists) throw new Error('없는 코드이거나 삭제된 그룹이에요.');
+      var d = snap.data(); d.code = code;
+      if ((d.memberUids || []).indexOf(uid0) !== -1) return d;
+      if ((d.memberUids || []).length >= MAX_GROUP_MEMBERS) throw new Error('이 그룹은 인원이 가득 찼어요 (최대 ' + MAX_GROUP_MEMBERS + '명).');
+      var upd = { memberUids: firebase.firestore.FieldValue.arrayUnion(uid0) };
+      upd['memberNames.' + uid0] = myName();
+      return ref.update(upd).then(function(){
+        d.memberUids = (d.memberUids || []).concat([uid0]);
+        d.memberNames = d.memberNames || {}; d.memberNames[uid0] = myName();
+        return d;
+      });
+    }).then(function(d){
+      var list = (state.groups.list || []).filter(function(x){ return x.code !== d.code; });
+      state.groups.list = [d].concat(list);
+      return d;
+    });
+  }
+
+  function addItemsToGroup(code, mats, withNote, who){
+    var batch = fbDb.batch();
+    var col = fbDb.collection('groups').doc(code).collection('items');
+    var now = Date.now();
+    mats.forEach(function(m){
+      var d = itemSnapshot(m, withNote);
+      d.addedByUid = state.user.uid; d.addedByName = who; d.addedAt = now;
+      batch.set(col.doc(state.user.uid + '_' + m.id), d);
+    });
+    return batch.commit();
+  }
+
+  function openGroup(code){
+    var g = state.groups;
+    g.active = code; g.items = null; g.itemsErr = null; g.filter = 'all';
+    loadGroupItems(code);
+  }
+
+  function loadGroupItems(code){
+    var g = state.groups;
+    g.itemsLoading = true; g.itemsErr = null; render();
+    var ref = fbDb.collection('groups').doc(code);
+    ref.collection('items').get().then(function(snap){
+      var list = [];
+      snap.forEach(function(d){
+        var x = d.data() || {};
+        var it = cleanSharedItem(x);
+        it.id = d.id;
+        it.addedByUid = String(x.addedByUid || '');
+        it.addedByName = String(x.addedByName || '익명').slice(0, 30);
+        it.addedAt = Number(x.addedAt) || 0;
+        list.push(it);
+      });
+      list.sort(function(a, b){ return b.addedAt - a.addedAt; });
+      if (g.active !== code) return;
+      g.items = list;
+      return ref.get();
+    }).then(function(snap){
+      if (g.active !== code) return;
+      if (snap && snap.exists){
+        var d = snap.data(); d.code = code;
+        g.list = [d].concat((g.list || []).filter(function(x){ return x.code !== code; }));
+        g.list.sort(function(a, b){ return (b.createdAt || 0) - (a.createdAt || 0); });
+      }
+      g.itemsLoading = false; render();
+    }).catch(function(err){
+      if (g.active !== code) return;
+      g.itemsLoading = false; g.items = g.items || [];
+      g.itemsErr = (err && err.code === 'permission-denied') ? '이 그룹의 자료를 볼 권한이 없어요. 그룹에서 나갔거나 삭제됐을 수 있어요.' : shareRulesMsg(err, '그룹');
+      render();
+    });
+  }
+
+  function scrapItems(items, groupName){
+    var have = existingUrlSet();
+    var added = 0, dup = 0;
+    var firstField = Object.keys(FIELD_TREE)[0];
+    items.forEach(function(it){
+      var n = normalizeUrl(it.url);
+      if (n && have[n]){ dup++; return; }
+      if (n) have[n] = true;
+      var m = {
+        id: uid(), title: it.title, field: it.field || firstField, subfield: it.subfield || null,
+        source: it.source || '미상', url: it.url || null,
+        scores: JSON.parse(JSON.stringify(it.scores)),
+        status: 'pending', rejectReason: null, createdAt: Date.now(), scrappedFrom: groupName || ''
+      };
+      if (it.summary) m.summary = it.summary;
+      state.materials.push(m);
+      added++;
+    });
+    if (added) saveMaterials();
+    showToast(added ? added + '개를 내 서고의 대기 목록에 담았어요' + (dup ? ' (이미 있는 ' + dup + '개는 건너뜀)' : '') : (dup ? '이미 내 서고에 있는 자료예요' : '담을 자료가 없어요'));
+    render();
+  }
+
+  function deleteGroupFully(code){
+    var ref = fbDb.collection('groups').doc(code);
+    return ref.collection('items').get().then(function(snap){
+      var docs = [];
+      snap.forEach(function(d){ docs.push(d.ref); });
+      var chain = Promise.resolve();
+      for (var i = 0; i < docs.length; i += 400){
+        (function(chunk){
+          chain = chain.then(function(){
+            var b = fbDb.batch();
+            chunk.forEach(function(r){ b.delete(r); });
+            return b.commit();
+          });
+        })(docs.slice(i, i + 400));
+      }
+      return chain;
+    }).then(function(){ return ref.delete(); });
+  }
+
+  // Best-effort: remove public links (and the profile share) before the account goes away.
+  function cleanupSharedDocs(){
+    var jobs = (state.sharedLinks || []).map(function(l){
+      return fbDb.collection('shared_collections').doc(l.code).delete().catch(function(){});
+    });
+    if (state.sharing && state.sharing.code) jobs.push(fbDb.collection('shared_profiles').doc(state.sharing.code).delete().catch(function(){}));
+    return Promise.all(jobs);
+  }
+
+  // ---- 공유 · 그룹 tab ----
+  function shareTabHtml(){
+    var g = state.groups;
+    var html = '<p class="section-title">공유 · 그룹</p>';
+    if (g.active) return html + groupDetailHtml();
+
+    html += '<p class="help-lead" style="font-size:16px;">승인·반려 자료함에서 자료를 골라 <b>공유 링크</b>를 만들거나 <b>그룹</b>(학급·동아리)에 넣을 수 있어요. 그룹은 코드를 아는 사람끼리만 쓰는 공간이에요.</p>';
+
+    html += '<div class="acct-block"><div class="field" style="margin:0;max-width:340px;"><label>공유할 때 보일 내 이름</label>' +
+      '<input type="text" id="share-myname" maxlength="30" placeholder="예: 유선웅" value="' + escapeHtml(state.displayName || '') + '"></div>' +
+      '<p class="sm-hint" style="margin:8px 0 0;">그룹과 공유 링크에는 이메일 대신 이 이름만 표시돼요.</p></div>';
+
+    html += '<p class="section-title" style="margin-top:28px;">내 그룹</p>';
+    html += '<div class="acct-block"><div class="field-row">' +
+      '<div class="field" style="margin:0;"><label>새 그룹 만들기</label><input type="text" id="grp-new-name" maxlength="40" placeholder="예: 1학년 3반 탐구반" value="' + escapeHtml(g.newName || '') + '"></div>' +
+      '<div style="align-self:flex-end;"><button type="button" class="btn small" id="grp-create" ' + (g.busy ? 'disabled' : '') + '>만들기</button></div></div>' +
+      '<div class="field-row" style="margin-top:14px;">' +
+      '<div class="field" style="margin:0;"><label>참여 코드로 들어가기</label><input type="text" id="grp-join-code" placeholder="XXXX-XXXX-XXXX" value="' + escapeHtml(g.joinCode || '') + '"></div>' +
+      '<div style="align-self:flex-end;"><button type="button" class="btn ghost small" id="grp-join" ' + (g.busy ? 'disabled' : '') + '>참여하기</button></div></div>' +
+      (g.msg ? '<p class="acct-msg ' + g.msg.type + '" style="margin:12px 0 0;">' + escapeHtml(g.msg.text) + '</p>' : '') +
+      '</div>';
+
+    if (g.loading && !g.list){
+      html += loadingHtml('그룹을 불러오는 중...');
+    } else {
+      if (g.err) html += '<p class="acct-msg err">' + escapeHtml(g.err) + '</p>';
+      var list = g.list || [];
+      if (!list.length){
+        html += '<div class="empty" style="height:auto;padding:24px 16px;"><p>아직 참여한 그룹이 없어요. 위에서 만들거나, 친구에게 받은 코드로 들어가세요.</p></div>';
+      } else {
+        list.forEach(function(x){
+          html += '<button type="button" class="grp-card" data-grp-open="' + escapeHtml(x.code) + '"><h4>' + escapeHtml(x.name) + '</h4>' +
+            '<div class="meta2">멤버 ' + (x.memberUids || []).length + '명' + (x.ownerUid === state.user.uid ? ' · 내가 만든 그룹' : '') + '</div></button>';
+        });
+      }
+      html += '<div style="margin:6px 0 0;"><button type="button" class="btn ghost small" id="grp-refresh">목록 새로고침</button></div>';
+    }
+
+    html += '<p class="section-title" style="margin-top:34px;">내 공유 링크 (' + state.sharedLinks.length + '개)</p>';
+    if (!state.sharedLinks.length){
+      html += '<div class="empty" style="height:auto;padding:24px 16px;"><p>아직 만든 링크가 없어요. 승인·반려 자료함에서 자료를 선택하고 "공유 링크 만들기"를 눌러보세요.</p></div>';
+    } else {
+      state.sharedLinks.forEach(function(l){
+        html += '<div class="acct-block"><div style="font-family:var(--font-display);font-size:18px;margin-bottom:4px;">' + escapeHtml(l.title) + '</div>' +
+          '<div class="meta2" style="font-size:13px;color:var(--cream-soft);margin-bottom:10px;">' + fmtDate(l.createdAt) + ' · 적절 ' + (l.approved || 0) + '개' + (l.rejected ? ' · 반려 ' + l.rejected + '개' : '') + '</div>' +
+          '<div class="sm-actions" style="margin:0;"><button type="button" class="btn small" data-l-copy="' + escapeHtml(l.code) + '">링크 복사</button>' +
+          '<a class="btn ghost small btn-link" href="' + escapeHtml(shareLinkUrl(l.code)) + '" target="_blank" rel="noopener noreferrer">열어 보기</a>' +
+          '<button type="button" class="btn ghost small" data-l-del="' + escapeHtml(l.code) + '" style="border-color:var(--reject);color:var(--reject);">공유 중단</button></div></div>';
+      });
+    }
+    return html;
+  }
+
+  function groupDetailHtml(){
+    var g = state.groups;
+    var grp = groupByCode(g.active);
+    var html = '<div style="margin-bottom:6px;"><button type="button" class="opn-back" id="grp-back">← 그룹 목록으로</button></div>';
+    if (!grp){
+      return html + '<div class="empty" style="height:auto;padding:30px 20px;"><h3>그룹을 찾을 수 없어요</h3><p>삭제되었거나 이미 나간 그룹이에요.</p></div>' +
+        (g.itemsLoading ? loadingHtml('불러오는 중...') : '');
+    }
+    var isOwner = grp.ownerUid === state.user.uid;
+    var names = grp.memberNames || {};
+    var members = (grp.memberUids || []).map(function(u){
+      return '<span class="chip">' + escapeHtml(names[u] || '멤버') + (u === grp.ownerUid ? '<b>방장</b>' : '') + '</span>';
+    }).join('');
+    html += '<h2 class="opn-issue-title">' + escapeHtml(grp.name) + '</h2>' +
+      '<div class="acct-block"><div class="acct-label">참여 코드</div>' +
+      '<div style="font-family:var(--font-mono);font-size:24px;letter-spacing:0.12em;color:var(--gold);margin-bottom:10px;">' + fmtShareCode(grp.code) + '</div>' +
+      '<div class="sm-actions" style="margin:0 0 12px;"><button type="button" class="btn ghost small" id="grp-copy-code">코드 복사</button></div>' +
+      '<p class="sm-hint" style="margin:0 0 12px;">이 코드를 아는 로그인 사용자는 누구나 들어올 수 있어요. 같은 반·동아리 사람에게만 알려주세요.</p>' +
+      '<div class="rej-chips" style="margin:0;">' + members + '</div></div>';
+
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">' +
+      '<button type="button" class="btn ghost small" id="grp-reload">자료 새로고침</button>' +
+      (isOwner
+        ? '<button type="button" class="btn ghost small" id="grp-delete" style="border-color:var(--reject);color:var(--reject);">그룹 삭제</button>'
+        : '<button type="button" class="btn ghost small" id="grp-leave" style="border-color:var(--reject);color:var(--reject);">그룹 나가기</button>') +
+      '</div>';
+
+    if (g.msg) html += '<p class="acct-msg ' + g.msg.type + '">' + escapeHtml(g.msg.text) + '</p>';
+    if (g.itemsErr) html += '<p class="acct-msg err">' + escapeHtml(g.itemsErr) + '</p>';
+    if (g.itemsLoading && !g.items) return html + loadingHtml('자료를 불러오는 중...');
+
+    var all = g.items || [];
+    if (!all.length){
+      return html + '<div class="empty" style="height:auto;padding:26px 16px;"><h3>아직 넣은 자료가 없어요</h3><p>승인·반려 자료함에서 자료를 선택하고 "그룹에 넣기"를 눌러보세요.</p></div>';
+    }
+    var list = all.filter(function(x){ return g.filter === 'all' || x.status === g.filter; });
+    html += '<div class="apv-controls">' + statusFilterHtml('grp-filter', g.filter, all) +
+      '<button type="button" class="btn small" id="grp-scrap-all" ' + (list.length ? '' : 'disabled') + '>표시된 ' + list.length + '개 내 서고에 담기</button></div>';
+    html += '<div class="apv-count">담은 자료는 내 서고의 <b>대기 목록</b>으로 들어가요. 내가 직접 카드 평가로 판단해 보세요.</div>';
+    html += list.map(function(it){
+      var mine = it.addedByUid === state.user.uid;
+      var acts = '<button type="button" class="btn ghost small" data-g-scrap="' + escapeHtml(it.id) + '">내 서고에 담기</button>' +
+        ((mine || isOwner) ? '<button type="button" class="btn ghost small" data-g-del="' + escapeHtml(it.id) + '">그룹에서 삭제</button>' : '');
+      return sharedItemHtml(it, escapeHtml(it.addedByName) + ' 님이 넣음' + (it.addedAt ? ' · ' + fmtDate(it.addedAt) : ''), acts);
+    }).join('');
+    return html;
+  }
+
+  function attachShareHandlers(){
+    // --- selection inside the vaults ---
+    document.querySelectorAll('[data-sel]').forEach(function(cb){
+      cb.addEventListener('change', function(){
+        var id = cb.getAttribute('data-sel');
+        if (cb.checked) state.sel[id] = true; else delete state.sel[id];
+        var y = window.scrollY; render(); window.scrollTo(0, y);
+      });
+    });
+    var selAll = document.getElementById('sel-all');
+    if (selAll) selAll.addEventListener('change', function(){
+      (state.selVisible || []).forEach(function(id){ if (selAll.checked) state.sel[id] = true; else delete state.sel[id]; });
+      var y = window.scrollY; render(); window.scrollTo(0, y);
+    });
+    document.querySelectorAll('[data-share-open]').forEach(function(btn){
+      btn.addEventListener('click', function(){ openShareModal(btn.getAttribute('data-share-open')); });
+    });
+
+    // --- share modal ---
+    var sm = state.shareModal;
+    if (sm){
+      var closeModal = function(){ state.shareModal = null; render(); };
+      var ov = document.getElementById('sm-overlay');
+      if (ov) ov.addEventListener('mousedown', function(e){ if (e.target === ov && !sm.busy) closeModal(); });
+      var bind = function(id, key, isCheck){
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', function(){ sm[key] = isCheck ? el.checked : el.value; });
+        if (el && isCheck) el.addEventListener('change', function(){ sm[key] = el.checked; });
+      };
+      bind('sm-title', 'title'); bind('sm-name', 'name'); bind('sm-note', 'withNote', true); bind('sm-newgroup', 'newGroup');
+      var cancel = document.getElementById('sm-cancel'); if (cancel) cancel.addEventListener('click', closeModal);
+      var close = document.getElementById('sm-close'); if (close) close.addEventListener('click', closeModal);
+      var go = document.getElementById('sm-go');
+      if (go) go.addEventListener('click', function(){ if (sm.kind === 'link') publishLink(); else addSelectedToGroup(); });
+      var copy = document.getElementById('sm-copy');
+      if (copy) copy.addEventListener('click', function(){ copyText(sm.result, '공유 링크를 복사했어요'); });
+      var urlEl = document.getElementById('sm-url');
+      if (urlEl) urlEl.addEventListener('focus', function(){ urlEl.select(); });
+      document.querySelectorAll('input[name="sm-group"]').forEach(function(r){
+        r.addEventListener('change', function(){ sm.pick = r.value; sm.msg = null; render(); var n = document.getElementById('sm-newgroup'); if (n) n.focus(); });
+      });
+      var vg = document.getElementById('sm-viewgroup');
+      if (vg) vg.addEventListener('click', function(){
+        var code = sm.result && sm.result.code;
+        state.shareModal = null; state.tab = 'share'; state.sel = {};
+        openGroup(code);
+      });
+    }
+
+    // --- 공유 · 그룹 tab ---
+    var g = state.groups;
+    var myNameEl = document.getElementById('share-myname');
+    if (myNameEl) myNameEl.addEventListener('change', function(){ state.displayName = myNameEl.value.trim().slice(0, 30); persistAppData(); showToast('이름을 저장했어요'); });
+    var newName = document.getElementById('grp-new-name');
+    if (newName) newName.addEventListener('input', function(){ g.newName = newName.value; });
+    var joinCode = document.getElementById('grp-join-code');
+    if (joinCode) joinCode.addEventListener('input', function(){ g.joinCode = joinCode.value; });
+    var createBtn = document.getElementById('grp-create');
+    if (createBtn) createBtn.addEventListener('click', function(){
+      var name = (g.newName || '').trim();
+      if (!name){ g.msg = { type: 'err', text: '그룹 이름을 입력해주세요.' }; render(); return; }
+      g.busy = true; g.msg = null; render();
+      createGroup(name, myName()).then(function(grp){
+        g.busy = false; g.newName = ''; g.msg = null;
+        openGroup(grp.code);
+      }).catch(function(err){
+        g.busy = false; g.msg = { type: 'err', text: shareRulesMsg(err, '그룹') }; render();
+      });
+    });
+    var joinBtn = document.getElementById('grp-join');
+    if (joinBtn) joinBtn.addEventListener('click', function(){
+      g.busy = true; g.msg = null; render();
+      joinGroup(g.joinCode).then(function(grp){
+        g.busy = false; g.joinCode = ''; g.msg = null;
+        openGroup(grp.code);
+      }).catch(function(err){
+        g.busy = false; g.msg = { type: 'err', text: shareRulesMsg(err, '그룹 참여') }; render();
+      });
+    });
+    var refreshBtn = document.getElementById('grp-refresh');
+    if (refreshBtn) refreshBtn.addEventListener('click', function(){ loadGroups(true); });
+    document.querySelectorAll('[data-grp-open]').forEach(function(b){
+      b.addEventListener('click', function(){ g.msg = null; openGroup(b.getAttribute('data-grp-open')); });
+    });
+    var backBtn = document.getElementById('grp-back');
+    if (backBtn) backBtn.addEventListener('click', function(){ g.active = null; g.items = null; g.msg = null; render(); });
+    var copyCode = document.getElementById('grp-copy-code');
+    if (copyCode) copyCode.addEventListener('click', function(){ copyText(fmtShareCode(g.active), '참여 코드를 복사했어요'); });
+    var reload = document.getElementById('grp-reload');
+    if (reload) reload.addEventListener('click', function(){ g.msg = null; loadGroupItems(g.active); });
+    var gFilter = document.getElementById('grp-filter');
+    if (gFilter) gFilter.addEventListener('change', function(){ g.filter = gFilter.value; render(); });
+
+    var leaveBtn = document.getElementById('grp-leave');
+    if (leaveBtn) leaveBtn.addEventListener('click', function(){
+      var grp = groupByCode(g.active); if (!grp) return;
+      if (!confirm('"' + grp.name + '" 그룹에서 나갈까요? 내가 넣은 자료는 그룹에 남아 있어요.')) return;
+      var upd = { memberUids: firebase.firestore.FieldValue.arrayRemove(state.user.uid) };
+      upd['memberNames.' + state.user.uid] = firebase.firestore.FieldValue.delete();
+      fbDb.collection('groups').doc(grp.code).update(upd).then(function(){
+        g.list = (g.list || []).filter(function(x){ return x.code !== grp.code; });
+        g.active = null; g.items = null; g.msg = { type: 'ok', text: '그룹에서 나갔어요.' };
+        render();
+      }).catch(function(err){ g.msg = { type: 'err', text: shareRulesMsg(err, '그룹') }; render(); });
+    });
+    var delBtn = document.getElementById('grp-delete');
+    if (delBtn) delBtn.addEventListener('click', function(){
+      var grp = groupByCode(g.active); if (!grp) return;
+      if (!confirm('"' + grp.name + '" 그룹을 삭제할까요? 그룹에 들어 있는 모든 자료와 멤버 연결이 사라지고 되돌릴 수 없어요.')) return;
+      g.msg = { type: 'ok', text: '삭제하는 중...' }; render();
+      deleteGroupFully(grp.code).then(function(){
+        g.list = (g.list || []).filter(function(x){ return x.code !== grp.code; });
+        g.active = null; g.items = null; g.msg = { type: 'ok', text: '그룹을 삭제했어요.' };
+        render();
+      }).catch(function(err){ g.msg = { type: 'err', text: shareRulesMsg(err, '그룹') }; render(); });
+    });
+    document.querySelectorAll('[data-g-del]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var id = b.getAttribute('data-g-del');
+        if (!confirm('이 자료를 그룹에서 삭제할까요?')) return;
+        fbDb.collection('groups').doc(g.active).collection('items').doc(id).delete().then(function(){
+          g.items = (g.items || []).filter(function(x){ return x.id !== id; });
+          showToast('그룹에서 삭제했어요');
+        }).catch(function(err){ g.msg = { type: 'err', text: shareRulesMsg(err, '그룹') }; render(); });
+      });
+    });
+    document.querySelectorAll('[data-g-scrap]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var id = b.getAttribute('data-g-scrap');
+        var it = (g.items || []).filter(function(x){ return x.id === id; })[0];
+        var grp = groupByCode(g.active);
+        if (it) scrapItems([it], grp ? grp.name : '');
+      });
+    });
+    var scrapAll = document.getElementById('grp-scrap-all');
+    if (scrapAll) scrapAll.addEventListener('click', function(){
+      var list = (g.items || []).filter(function(x){ return g.filter === 'all' || x.status === g.filter; });
+      var grp = groupByCode(g.active);
+      scrapItems(list, grp ? grp.name : '');
+    });
+
+    // links
+    document.querySelectorAll('[data-l-copy]').forEach(function(b){
+      b.addEventListener('click', function(){ copyText(shareLinkUrl(b.getAttribute('data-l-copy')), '공유 링크를 복사했어요'); });
+    });
+    document.querySelectorAll('[data-l-del]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var code = b.getAttribute('data-l-del');
+        if (!confirm('이 공유 링크를 중단할까요? 링크를 가진 사람은 더 이상 볼 수 없어요.')) return;
+        fbDb.collection('shared_collections').doc(code).delete().then(function(){
+          state.sharedLinks = state.sharedLinks.filter(function(l){ return l.code !== code; });
+          persistAppData();
+          showToast('공유를 중단했어요');
+          render();
+        }).catch(function(err){ showToast('중단하지 못했어요: ' + shareRulesMsg(err, '공유 링크')); });
+      });
+    });
   }
 
   // ---- Compare tab ----
@@ -2420,9 +3404,16 @@
   }
 
   // ---------- event wiring ----------
+  function goTab(t){
+    if (state.tab !== t){ state.sel = {}; state.shareModal = null; }
+    if (t === 'share'){ state.groups.active = null; state.groups.msg = null; }
+    state.tab = t; state.menuOpen = false;
+    render();
+    if (t === 'share') loadGroups(false);
+  }
   function attachHandlers(pending, approved, rejected){
     document.querySelectorAll('[data-goto]').forEach(function(btn){
-      btn.addEventListener('click', function(){ state.tab = btn.getAttribute('data-goto'); state.menuOpen = false; render(); });
+      btn.addEventListener('click', function(){ goTab(btn.getAttribute('data-goto')); });
     });
 
     // hamburger drawer menu
@@ -2441,11 +3432,7 @@
       });
     });
     document.querySelectorAll('[data-menu-tab]').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        state.tab = btn.getAttribute('data-menu-tab');
-        state.menuOpen = false;
-        render();
-      });
+      btn.addEventListener('click', function(){ goTab(btn.getAttribute('data-menu-tab')); });
     });
 
     // swipe
@@ -3096,6 +4083,40 @@
     var rejFilterEl = document.getElementById('rej-filter');
     if (rejFilterEl) rejFilterEl.addEventListener('change', function(){ state.rejFilter = rejFilterEl.value; render(); });
 
+    attachShareHandlers();
+
+    // tutorial + help
+    function tutGo(n){ state.tutorialStep = Math.max(0, Math.min(TUTORIAL_STEPS.length - 1, n)); render(); }
+    function tutFinish(){
+      state.tutorialOpen = false; state.tutorialDone = true; state.tutorialStep = 0;
+      persistAppData();
+      render();
+    }
+    var tutNext = document.getElementById('tut-next');
+    if (tutNext) tutNext.addEventListener('click', function(){
+      if (state.tutorialStep >= TUTORIAL_STEPS.length - 1) tutFinish(); else tutGo(state.tutorialStep + 1);
+    });
+    var tutPrev = document.getElementById('tut-prev');
+    if (tutPrev) tutPrev.addEventListener('click', function(){ tutGo(state.tutorialStep - 1); });
+    var tutSkip = document.getElementById('tut-skip');
+    if (tutSkip) tutSkip.addEventListener('click', tutFinish);
+    var tutSkipX = document.getElementById('tut-skip-x');
+    if (tutSkipX) tutSkipX.addEventListener('click', tutFinish);
+    document.querySelectorAll('[data-tut-step]').forEach(function(b){
+      b.addEventListener('click', function(){ tutGo(parseInt(b.getAttribute('data-tut-step'), 10)); });
+    });
+    var helpReplay = document.getElementById('help-replay');
+    if (helpReplay) helpReplay.addEventListener('click', function(){ state.tutorialStep = 0; state.tutorialOpen = true; render(); });
+    if (!window.__tutKeysBound){
+      window.__tutKeysBound = true;
+      document.addEventListener('keydown', function(e){
+        if (!state.tutorialOpen) return;
+        if (e.key === 'Escape'){ state.tutorialOpen = false; state.tutorialDone = true; state.tutorialStep = 0; persistAppData(); render(); }
+        else if (e.key === 'ArrowRight'){ if (state.tutorialStep < TUTORIAL_STEPS.length - 1){ state.tutorialStep++; render(); } }
+        else if (e.key === 'ArrowLeft'){ if (state.tutorialStep > 0){ state.tutorialStep--; render(); } }
+      });
+    }
+
     // approved tab
     var apvQ = document.getElementById('apv-q');
     if (apvQ){
@@ -3311,6 +4332,8 @@
       state.acctDeleteLoading = true; state.acctDeleteMsg = null; render();
       var uidToDelete = state.user.uid;
       reauthenticate(pw).then(function(){
+        return cleanupSharedDocs();
+      }).then(function(){
         return fbDb.collection('users').doc(uidToDelete).collection('store').get();
       }).then(function(snap){
         var batch = fbDb.batch();
@@ -3344,6 +4367,16 @@
       FIREBASE_READY = false;
       state.authChecked = true;
       render();
+      return;
+    }
+    var viewerCode = '';
+    try { viewerCode = normShareCode(new URLSearchParams(location.search).get('s')); } catch(e){ viewerCode = ''; }
+    if (viewerCode){
+      // public read-only page: no login, no auth listener
+      state.viewer = { code: viewerCode, loading: true, err: null, data: null, filter: 'all' };
+      state.authChecked = true;
+      render();
+      loadViewer();
       return;
     }
     fbAuth.onAuthStateChanged(function(user){
